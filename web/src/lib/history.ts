@@ -1,6 +1,6 @@
-// Analyses of logged observations, used by the History and Track comparison pages.
-
-import { RAIN_THRESHOLD_MM } from "./stats.ts";
+// Past weather by day, for the History and Track comparison pages. The days come
+// from the reanalysis archive (history-source.ts) or, when that cannot be reached,
+// from the observations bundled with the app, read here.
 
 export interface Observation {
   time: number;
@@ -11,8 +11,11 @@ export interface Observation {
   rain: number | null;
 }
 
-/** A track needs readings on at least this many days before its history is drawn. */
-export const MIN_DAYS_LOGGED = 2;
+/** A track needs at least this many days before its history is drawn. */
+export const MIN_DAYS = 2;
+
+/** A day counts as a rain day from 1 mm, the usual definition of a wet day. */
+export const RAIN_DAY_MM = 1;
 
 // The collector's column names, with the shorter names also accepted.
 const COLUMNS = {
@@ -91,26 +94,17 @@ export function utcDay(time: number): string {
   return new Date(time).toISOString().slice(0, 10);
 }
 
-export function daysLogged(
-  history: readonly Observation[],
-  trackId: string,
-): number {
-  return new Set(
-    history
-      .filter((row) => row.trackId === trackId)
-      .map((row) => utcDay(row.time)),
-  ).size;
-}
-
 export interface DailyWeather {
   day: string;
   temperatureMin: number | null;
   temperatureMax: number | null;
   temperatureMean: number | null;
-  /** Estimated daily rain in mm. */
-  rain: number;
+  /** The day's rain in mm. */
+  rain: number | null;
   /** Highest minus lowest temperature of the day. */
   temperatureRange: number | null;
+  /** The day's strongest wind in m/s; the bundled observations have none. */
+  windMax: number | null;
 }
 
 const mean = (values: number[]) =>
@@ -118,8 +112,8 @@ const mean = (values: number[]) =>
     ? values.reduce((sum, value) => sum + value, 0) / values.length
     : null;
 
-/** Daily rain estimate and temperature range for one track, oldest day first. */
-export function trackRainHistory(
+/** The bundled observations of one track as days, oldest first. */
+export function observedDays(
   history: readonly Observation[],
   trackId: string,
 ): DailyWeather[] {
@@ -149,8 +143,18 @@ export function trackRainHistory(
         temperatureMean: mean(temperatures),
         rain,
         temperatureRange: min === null || max === null ? null : max - min,
+        windMax: null,
       };
     });
+}
+
+/** Where a track's days came from. */
+export type HistoryOrigin = "archive" | "bundled";
+
+export interface TrackHistory {
+  trackId: string;
+  origin: HistoryOrigin;
+  days: DailyWeather[];
 }
 
 export class TrackSummary {
@@ -160,7 +164,9 @@ export class TrackSummary {
     readonly averageTemperature: number | null,
     readonly rainDays: number,
     readonly totalRain: number,
-    readonly daysLogged: number,
+    readonly days: number,
+    /** In m/s; null when no day has a wind value. */
+    readonly strongestWind: number | null,
   ) {}
 
   toString(): string {
@@ -168,78 +174,52 @@ export class TrackSummary {
       this.averageTemperature === null
         ? "no temperature"
         : `average ${this.averageTemperature.toFixed(1)} °C`;
-    return `${this.track}: ${average}, ${this.rainDays} rain days, ${this.totalRain.toFixed(1)} mm total rain over ${this.daysLogged} logged days.`;
+    return `${this.track}: ${average}, ${this.rainDays} rain days, ${this.totalRain.toFixed(1)} mm total rain over ${this.days} days.`;
   }
 }
 
-/** Summaries of the given tracks, ranked from wettest to driest. */
-export function compareTrackHistory(
-  history: readonly Observation[],
-  trackIds: readonly string[],
-): TrackSummary[] {
-  const summaries: TrackSummary[] = [];
-  for (const trackId of trackIds) {
-    const rows = history.filter((row) => row.trackId === trackId);
-    if (rows.length === 0) continue;
-    const daily = trackRainHistory(history, trackId);
-    summaries.push(
-      new TrackSummary(
-        trackId,
-        rows[0].track,
-        mean(
-          rows
-            .map((row) => row.temperature)
-            .filter((value): value is number => value !== null),
-        ),
-        // Same threshold as the forecasts: below 0.1 mm a day is not rainy.
-        daily.filter((day) => day.rain >= RAIN_THRESHOLD_MM).length,
-        daily.reduce((sum, day) => sum + day.rain, 0),
-        daily.length,
-      ),
-    );
-  }
-  // A stable sort keeps the chosen order for tracks with the same rain.
-  return summaries.sort((a, b) => b.totalRain - a.totalRain);
-}
+const numbers = (values: (number | null)[]) =>
+  values.filter((value): value is number => value !== null);
 
-export interface HistoryTrack {
-  id: string;
-  name: string;
-}
-
-/** Tracks with enough logged history, in the order they first appear. */
-export function historyTracks(history: readonly Observation[]): HistoryTrack[] {
-  const names = new Map<string, string>();
-  const days = new Map<string, Set<string>>();
-  for (const row of history) {
-    if (!names.has(row.trackId)) names.set(row.trackId, row.track);
-    const set = days.get(row.trackId) ?? new Set<string>();
-    set.add(utcDay(row.time));
-    days.set(row.trackId, set);
-  }
-  return [...names.entries()]
-    .filter(([id]) => days.get(id)!.size >= MIN_DAYS_LOGGED)
-    .map(([id, name]) => ({ id, name }));
-}
-
-/** The rows of the period every chosen track was logged, or null when they never overlap. */
-export function sharedPeriod(
-  history: readonly Observation[],
-  trackIds: readonly string[],
-): Observation[] | null {
-  let start = -Infinity;
-  let end = Infinity;
-  for (const trackId of trackIds) {
-    const times = history
-      .filter((row) => row.trackId === trackId)
-      .map((row) => row.time);
-    if (times.length === 0) return null;
-    start = Math.max(start, Math.min(...times));
-    end = Math.min(end, Math.max(...times));
-  }
-  if (start > end) return null;
-  const chosen = new Set(trackIds);
-  return history.filter(
-    (row) => chosen.has(row.trackId) && row.time >= start && row.time <= end,
+export function summarise(
+  trackId: string,
+  track: string,
+  days: readonly DailyWeather[],
+): TrackSummary {
+  const rains = numbers(days.map((day) => day.rain));
+  const winds = numbers(days.map((day) => day.windMax));
+  return new TrackSummary(
+    trackId,
+    track,
+    mean(numbers(days.map((day) => day.temperatureMean))),
+    rains.filter((rain) => rain >= RAIN_DAY_MM).length,
+    rains.reduce((sum, rain) => sum + rain, 0),
+    days.length,
+    winds.length ? Math.max(...winds) : null,
   );
+}
+
+/** Wettest first. A stable sort keeps the given order for the same rain. */
+export function rankByRain(summaries: readonly TrackSummary[]): TrackSummary[] {
+  return [...summaries].sort((a, b) => b.totalRain - a.totalRain);
+}
+
+/** The days every one of the histories has, oldest first, so tracks are compared fairly. */
+export function sharedDays(histories: readonly TrackHistory[]): string[] {
+  if (histories.length === 0) return [];
+  const [first, ...others] = histories.map(
+    (history) => new Set(history.days.map((day) => day.day)),
+  );
+  return [...first]
+    .filter((day) => others.every((days) => days.has(day)))
+    .sort();
+}
+
+/** One history cut down to the given days. */
+export function onDays(
+  history: TrackHistory,
+  days: readonly string[],
+): DailyWeather[] {
+  const wanted = new Set(days);
+  return history.days.filter((day) => wanted.has(day.day));
 }
