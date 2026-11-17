@@ -1,4 +1,4 @@
-// A JSON GET with a timeout, the status checks and one clear message per failure.
+// A GET with a timeout, the status checks and one clear message per failure.
 // The messages are fixed text on purpose: a network error's own text can contain
 // the full URL, and nothing from it should reach the page.
 
@@ -27,7 +27,9 @@ export type FailureKind =
   | "status"
   | "unreadable"
   | "format"
-  | "input";
+  | "input"
+  /** Not a failure: the service has nothing for this place. */
+  | "no-coverage";
 
 export const TIMEOUT_MS = 10_000;
 
@@ -47,12 +49,18 @@ export const MESSAGES = {
     `The weather service has a problem on its side (status ${status}). Try again later.`,
   status: (status: number) => `The weather service returned status ${status}.`,
   unreadable: "The weather service sent a response that could not be read.",
+  noCoverage: "No forecast for this place.",
 };
 
 export interface GetOptions {
   headers?: Record<string, string>;
   timeoutMs?: number;
   notFoundMessage?: string;
+  /**
+   * Statuses that mean "nothing for this place" for this service (for example
+   * a 404 for a point outside its area), reported as no-coverage, not a failure.
+   */
+  noCoverageStatuses?: readonly number[];
   fetch?: FetchLike;
 }
 
@@ -60,10 +68,8 @@ function isOffline(): boolean {
   return typeof navigator !== "undefined" && navigator.onLine === false;
 }
 
-export async function getJson(
-  url: string,
-  options: GetOptions = {},
-): Promise<unknown> {
+/** The successful response, or a ServiceError. The browser's HTTP cache is left on. */
+async function get(url: string, options: GetOptions): Promise<Response> {
   const fetchImpl = options.fetch ?? ((input, init) => fetch(input, init));
   if (isOffline()) throw new ServiceError("offline", MESSAGES.offline);
 
@@ -84,6 +90,8 @@ export async function getJson(
   }
 
   const { status } = response;
+  if (options.noCoverageStatuses?.includes(status))
+    throw new ServiceError("no-coverage", MESSAGES.noCoverage);
   if (status === 400) throw new ServiceError("rejected", MESSAGES.badRequest);
   if (status === 401 || status === 403)
     throw new ServiceError("rejected", MESSAGES.refused(status));
@@ -96,9 +104,29 @@ export async function getJson(
     throw new ServiceError("rate-limited", MESSAGES.rateLimited);
   if (status >= 500) throw new ServiceError("server", MESSAGES.server(status));
   if (status !== 200) throw new ServiceError("status", MESSAGES.status(status));
+  return response;
+}
 
+export async function getJson(
+  url: string,
+  options: GetOptions = {},
+): Promise<unknown> {
+  const response = await get(url, options);
   try {
     return await response.json();
+  } catch {
+    throw new ServiceError("unreadable", MESSAGES.unreadable);
+  }
+}
+
+/** For the services that answer in XML. */
+export async function getText(
+  url: string,
+  options: GetOptions = {},
+): Promise<string> {
+  const response = await get(url, options);
+  try {
+    return await response.text();
   } catch {
     throw new ServiceError("unreadable", MESSAGES.unreadable);
   }

@@ -2,9 +2,15 @@
 
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { getJson, ServiceError, userMessage } from "../web/src/lib/http.ts";
-import { openMeteo, validateLocation } from "../web/src/lib/providers.ts";
-import { fakeFetch, json, status } from "./helpers.ts";
+import {
+  getJson,
+  getText,
+  ServiceError,
+  TIMEOUT_MS,
+  userMessage,
+} from "../web/src/lib/http.ts";
+import { openMeteo, validateLocation } from "../web/src/lib/providers/index.ts";
+import { fakeFetch, json, status, text } from "./helpers.ts";
 
 const URL = "https://api.example.test/forecast?lat=1&secret=abc";
 
@@ -96,4 +102,38 @@ test("a bad location is stopped before any call", async () => {
     /no name/,
   );
   assert.equal(fetch.calls.length, 0);
+});
+
+test("text answers go through the same checks", async () => {
+  assert.equal(await getText(URL, { fetch: fakeFetch(text("<a/>")) }), "<a/>");
+  await assert.rejects(
+    getText(URL, { fetch: fakeFetch(status(503)) }),
+    /problem on its side \(status 503\)/,
+  );
+});
+
+test("a status a service uses for 'nothing here' is not a failure", async () => {
+  for (const code of [404, 400])
+    await assert.rejects(
+      getJson(URL, {
+        fetch: fakeFetch(status(code)),
+        noCoverageStatuses: [code],
+      }),
+      (error) => error instanceof ServiceError && error.kind === "no-coverage",
+    );
+  // Without that option the same status is the usual failure.
+  await assert.rejects(
+    getJson(URL, { fetch: fakeFetch(status(404)) }),
+    (error) => error instanceof ServiceError && error.kind === "not-found",
+  );
+});
+
+test("every request has a timeout and leaves the HTTP cache on", async () => {
+  const fetch = fakeFetch(json({}));
+  await getJson(URL, { fetch });
+  const { init } = fetch.calls[0];
+  assert.ok(init?.signal instanceof AbortSignal);
+  // No cache override: the browser follows each service's Expires header.
+  assert.equal(init?.cache, undefined);
+  assert.equal(TIMEOUT_MS, 10_000);
 });
