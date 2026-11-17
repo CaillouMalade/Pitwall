@@ -1,20 +1,23 @@
-import { useState } from "react";
-import { ChevronRight } from "lucide-react";
+import { Info, Pencil, Plus, Settings } from "lucide-react";
 import { GRADE1_TRACKS } from "../data/grade1-tracks.ts";
 import { formatDayTime } from "../lib/format.ts";
 import type { Session } from "../lib/sessions.ts";
-import { appendUserTrack } from "../lib/storage.ts";
-import { checkNewTrack, TrackInputError } from "../lib/tracks.ts";
 import type { Track } from "../lib/types.ts";
-import { ThemeSwitch } from "./ThemeSwitch.tsx";
 
 interface Props {
-  tracks: Track[];
-  userTracks: Track[];
+  tracks: readonly Track[];
+  userTracks: readonly Track[];
   track: Track;
   sessions: Session[];
+  /** The session shown on the Session dashboard, when that page is open. */
+  currentSession: number | null;
   onSelect: (id: string) => void;
-  onAdded: (track: Track, all: Track[]) => void;
+  onSession: (index: number) => void;
+  onAddTrack: () => void;
+  onEditTrack: () => void;
+  onEditWeekend: () => void;
+  onSettings: () => void;
+  onAbout: () => void;
 }
 
 export function Sidebar({
@@ -22,9 +25,16 @@ export function Sidebar({
   userTracks,
   track,
   sessions,
+  currentSession,
   onSelect,
-  onAdded,
+  onSession,
+  onAddTrack,
+  onEditTrack,
+  onEditWeekend,
+  onSettings,
+  onAbout,
 }: Props) {
+  const own = userTracks.some((item) => item.id === track.id);
   return (
     <aside className="sidebar">
       <div className="brand">
@@ -32,33 +42,57 @@ export function Sidebar({
         <span>Pitwall</span>
       </div>
 
-      <section aria-labelledby="track-heading" className="side-section">
-        <h2 id="track-heading" className="side-heading">
-          Track
-        </h2>
-        <select
-          className="track-select"
-          aria-label="Track"
-          value={track.id}
-          onChange={(event) => onSelect(event.target.value)}
-        >
-          <optgroup label="FIA Grade 1">
-            {GRADE1_TRACKS.map((item) => (
-              <option key={item.id} value={item.id}>
-                {item.name}
-              </option>
-            ))}
-          </optgroup>
-          {userTracks.length > 0 && (
-            <optgroup label="Your tracks">
-              {userTracks.map((item) => (
+      <section aria-labelledby="track-heading" className="side-section tracks">
+        <div className="side-row">
+          <h2 id="track-heading" className="side-heading">
+            Tracks
+          </h2>
+          <select
+            className="track-select"
+            aria-label="Track"
+            value={track.id}
+            onChange={(event) => onSelect(event.target.value)}
+          >
+            <optgroup label="FIA Grade 1">
+              {GRADE1_TRACKS.map((item) => (
                 <option key={item.id} value={item.id}>
                   {item.name}
                 </option>
               ))}
             </optgroup>
-          )}
-        </select>
+            {userTracks.length > 0 && (
+              <optgroup label="Your tracks">
+                {userTracks.map((item) => (
+                  <option key={item.id} value={item.id}>
+                    {item.name}
+                  </option>
+                ))}
+              </optgroup>
+            )}
+          </select>
+          <div className="side-actions">
+            {own && (
+              <button
+                type="button"
+                className="icon-button"
+                onClick={onEditTrack}
+                aria-label={`Edit ${track.name}`}
+                title="Edit track"
+              >
+                <Pencil size={14} aria-hidden="true" />
+              </button>
+            )}
+            <button
+              type="button"
+              className="icon-button"
+              onClick={onAddTrack}
+              aria-label="Add a track"
+              title="Add a track"
+            >
+              <Plus size={16} aria-hidden="true" />
+            </button>
+          </div>
+        </div>
         <ul className="track-list" aria-label="Tracks">
           {tracks.map((item, index) => (
             <li key={item.id}>
@@ -80,143 +114,49 @@ export function Sidebar({
       </section>
 
       <section aria-labelledby="sessions-heading" className="side-section">
-        <h2 id="sessions-heading" className="side-heading">
-          Sessions <span className="muted">UTC</span>
-        </h2>
-        <dl className="session-list">
-          {sessions.map((session) => (
-            <div key={session.name}>
-              <dt>{session.name}</dt>
-              <dd>{formatDayTime(session.start)}</dd>
-            </div>
+        <div className="side-row">
+          <h2 id="sessions-heading" className="side-heading">
+            Sessions <span className="muted">UTC</span>
+          </h2>
+          <div className="side-actions">
+            <button
+              type="button"
+              className="icon-button"
+              onClick={onEditWeekend}
+              aria-label="Edit sessions"
+              title="Edit sessions"
+            >
+              <Pencil size={14} aria-hidden="true" />
+            </button>
+          </div>
+        </div>
+        <ul className="session-list" aria-label="Sessions">
+          {sessions.map((session, index) => (
+            <li key={session.name}>
+              <button
+                type="button"
+                className="session-item"
+                aria-current={currentSession === index ? "true" : undefined}
+                onClick={() => onSession(index)}
+              >
+                <span className="session-name">{session.name}</span>
+                <span className="session-time">
+                  {formatDayTime(session.start)}
+                </span>
+              </button>
+            </li>
           ))}
-        </dl>
+        </ul>
       </section>
 
-      <AddTrack tracks={tracks} onAdded={onAdded} />
-
       <div className="side-footer">
-        <ThemeSwitch />
+        <button type="button" className="side-button" onClick={onSettings}>
+          <Settings size={15} aria-hidden="true" /> Settings
+        </button>
+        <button type="button" className="side-button" onClick={onAbout}>
+          <Info size={15} aria-hidden="true" /> About
+        </button>
       </div>
     </aside>
-  );
-}
-
-function AddTrack({
-  tracks,
-  onAdded,
-}: {
-  tracks: Track[];
-  onAdded: Props["onAdded"];
-}) {
-  const [open, setOpen] = useState(false);
-  const [name, setName] = useState("");
-  const [latitude, setLatitude] = useState("");
-  const [longitude, setLongitude] = useState("");
-  const [error, setError] = useState<{ field: string; message: string } | null>(
-    null,
-  );
-  const [added, setAdded] = useState<string | null>(null);
-
-  const submit = (event: React.FormEvent) => {
-    event.preventDefault();
-    try {
-      const track = checkNewTrack(
-        name,
-        latitude,
-        longitude,
-        tracks,
-        GRADE1_TRACKS,
-      );
-      const all = appendUserTrack(track);
-      setName("");
-      setLatitude("");
-      setLongitude("");
-      setError(null);
-      setAdded(track.name);
-      onAdded(track, all);
-    } catch (problem) {
-      setAdded(null);
-      setError(
-        problem instanceof TrackInputError
-          ? { field: problem.field, message: problem.message }
-          : { field: "location", message: (problem as Error).message },
-      );
-    }
-  };
-
-  const invalid = (field: string) =>
-    error?.field === field ? true : undefined;
-
-  return (
-    <section className="side-section">
-      <button
-        type="button"
-        className="disclosure"
-        aria-expanded={open}
-        aria-controls="add-track-form"
-        onClick={() => setOpen(!open)}
-      >
-        <ChevronRight
-          size={14}
-          aria-hidden="true"
-          className="disclosure-icon"
-        />
-        Add a track
-      </button>
-      {open && (
-        <form
-          id="add-track-form"
-          className="add-track"
-          onSubmit={submit}
-          noValidate
-        >
-          <label>
-            <span>Name</span>
-            <input
-              value={name}
-              onChange={(event) => setName(event.target.value)}
-              placeholder="Monza Parabolica"
-              aria-invalid={invalid("name")}
-              autoComplete="off"
-            />
-          </label>
-          <div className="coordinates">
-            <label>
-              <span>Latitude</span>
-              <input
-                value={latitude}
-                onChange={(event) => setLatitude(event.target.value)}
-                placeholder="45.615"
-                inputMode="decimal"
-                aria-invalid={invalid("latitude")}
-                autoComplete="off"
-              />
-            </label>
-            <label>
-              <span>Longitude</span>
-              <input
-                value={longitude}
-                onChange={(event) => setLongitude(event.target.value)}
-                placeholder="9.29"
-                inputMode="decimal"
-                aria-invalid={invalid("longitude")}
-                autoComplete="off"
-              />
-            </label>
-          </div>
-          <button type="submit" className="button primary">
-            Add track
-          </button>
-          <p className="form-message" role="status" aria-live="polite">
-            {error ? (
-              <span className="form-error">{error.message}</span>
-            ) : added ? (
-              `Added ${added}.`
-            ) : null}
-          </p>
-        </form>
-      )}
-    </section>
   );
 }

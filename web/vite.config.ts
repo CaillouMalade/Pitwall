@@ -1,13 +1,20 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
+import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
+
+const { version } = JSON.parse(
+  readFileSync(new URL("../package.json", import.meta.url), "utf8"),
+) as { version: string };
 
 export default defineConfig({
   root: fileURLToPath(new URL(".", import.meta.url)),
   plugins: [react()],
+  define: { __APP_VERSION__: JSON.stringify(version) },
   resolve: { alias: { "@": fileURLToPath(new URL("./src", import.meta.url)) } },
   build: {
-    // The bundled observation log is one lazily loaded chunk of about 110 kB gzipped.
+    // The bundled observation log is one lazily loaded chunk of about 110 kB gzipped,
+    // fetched only when the weather archive cannot be reached.
     chunkSizeWarningLimit: 700,
     outDir: "../dist",
     emptyOutDir: true,

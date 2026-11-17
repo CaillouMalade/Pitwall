@@ -1,13 +1,14 @@
 import { useEffect, useState } from "react";
 import { Monitor, Moon, Sun } from "lucide-react";
 import { readText, THEME_KEY, writeText } from "../lib/storage.ts";
+import { Segmented } from "./ui.tsx";
 
 type Choice = "system" | "light" | "dark";
 
 const OPTIONS = [
-  { value: "system", label: "System", Icon: Monitor },
-  { value: "light", label: "Light", Icon: Sun },
-  { value: "dark", label: "Dark", Icon: Moon },
+  { value: "system", label: "System", icon: <Monitor size={14} aria-hidden /> },
+  { value: "light", label: "Light", icon: <Sun size={14} aria-hidden /> },
+  { value: "dark", label: "Dark", icon: <Moon size={14} aria-hidden /> },
 ] as const;
 
 function apply(choice: Choice) {
@@ -35,26 +36,15 @@ export function ThemeSwitch() {
     return () => query.removeEventListener("change", follow);
   }, [choice]);
 
-  const choose = (value: Choice) => {
-    setChoice(value);
-    writeText(THEME_KEY, value);
-  };
-
   return (
-    <div className="segmented" role="radiogroup" aria-label="Appearance">
-      {OPTIONS.map(({ value, label, Icon }) => (
-        <button
-          key={value}
-          type="button"
-          role="radio"
-          aria-checked={choice === value}
-          aria-label={label}
-          title={label}
-          onClick={() => choose(value)}
-        >
-          <Icon size={14} aria-hidden="true" />
-        </button>
-      ))}
-    </div>
+    <Segmented<Choice>
+      label="Appearance"
+      value={choice}
+      options={OPTIONS}
+      onChange={(value) => {
+        setChoice(value);
+        writeText(THEME_KEY, value);
+      }}
+    />
   );
 }

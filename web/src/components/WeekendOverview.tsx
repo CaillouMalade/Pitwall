@@ -1,82 +1,111 @@
+import { formatDayTime } from "../lib/format.ts";
 import { combineForecasts } from "../lib/stats.ts";
+import { centreOf } from "../lib/sources.ts";
 import { WEEKEND_DAYS, type Session } from "../lib/sessions.ts";
+import { formatCoordinates } from "../lib/tracks.ts";
 import type { Track } from "../lib/types.ts";
 import { useForecast, useRadar } from "../lib/use-data.ts";
 import { DAY } from "../lib/windows.ts";
 import { RainTemperatureChart, WindChart } from "./ForecastCharts.tsx";
 import { CircuitMap, RadarMap } from "./Maps.tsx";
+import { SourcesCard } from "./SourcesCard.tsx";
 import {
   Card,
   Empty,
   Loading,
+  Notice,
   PageHeader,
   RefreshButton,
   Warnings,
 } from "./ui.tsx";
 
+export function trackSubtitle(track: Track): string {
+  return track.country || formatCoordinates(track);
+}
+
 export function WeekendOverview({
   track,
   sessions,
+  start,
+  now,
 }: {
   track: Track;
   sessions: Session[];
+  /** Midnight (UTC) of the weekend's first day. */
+  start: number;
+  now: number;
 }) {
-  const { data, refresh } = useForecast(track);
+  const { data, refresh, online } = useForecast(track);
   const radar = useRadar();
-  // The day of the first session: the weekend starts at its midnight (UTC).
-  const start = Math.floor(sessions[0].start / DAY) * DAY;
   const end = start + WEEKEND_DAYS * DAY;
+  const retry = (
+    <button type="button" className="button" onClick={refresh}>
+      Try again
+    </button>
+  );
 
   let body;
   if (data.state === "loading")
-    body = <Loading label="Fetching the forecasts" />;
-  else if (data.state === "failed") body = <Empty>{data.message}</Empty>;
+    body = <Loading label="Fetching the forecasts" rows={2} />;
+  else if (data.state === "failed")
+    body = <Empty action={retry}>{data.message}</Empty>;
   else {
-    const { points, failures } = data.value;
+    const { points, failures, statuses, saved, fetchedAt } = data.value;
     // Only the 3 race days, so the charts match the sessions.
     const weekend = points.filter(
       (point) => point.time >= start && point.time < end,
     );
-    const windows = combineForecasts(weekend);
+    const windows = combineForecasts(weekend, (source) =>
+      centreOf(source, track),
+    );
     body = (
       <>
-        <Warnings messages={failures} />
+        {saved ? (
+          <Notice>
+            {online ? "The weather services cannot be reached." : "Offline."}{" "}
+            Showing the forecast from {formatDayTime(fetchedAt)} UTC.
+          </Notice>
+        ) : (
+          <Warnings messages={failures} />
+        )}
         {points.length === 0 ? (
-          <Empty>
-            No forecast could be loaded. Try again in a few minutes.
+          <Empty action={retry}>
+            {online
+              ? "No forecast could be loaded."
+              : "Offline. No forecast is saved for this track yet."}
           </Empty>
         ) : windows.length === 0 ? (
-          <Empty>No forecast reaches the race weekend yet.</Empty>
+          <Empty>
+            {end <= now
+              ? "This weekend is over."
+              : "No forecast reaches this weekend yet."}
+          </Empty>
         ) : (
           <>
             <Card title="Rain and temperature">
               <RainTemperatureChart
                 windows={windows}
-                points={weekend}
                 sessions={sessions}
                 start={start}
               />
             </Card>
             <Card title="Wind">
-              <WindChart
-                windows={windows}
-                points={weekend}
-                sessions={sessions}
-                start={start}
-              />
+              <WindChart windows={windows} sessions={sessions} start={start} />
             </Card>
           </>
         )}
+        {!saved && statuses.length > 0 && <SourcesCard statuses={statuses} />}
       </>
     );
   }
 
   return (
     <>
-      <PageHeader title={track.name} subtitle={track.country}>
+      <PageHeader title={track.name} subtitle={trackSubtitle(track)}>
         <RefreshButton
           fetchedAt={data.state === "ready" ? data.value.fetchedAt : undefined}
           onRefresh={refresh}
+          busy={data.state === "loading"}
         />
       </PageHeader>
       {body}

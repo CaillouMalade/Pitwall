@@ -1,29 +1,32 @@
 import { ArrowUp, ChevronLeft, ChevronRight } from "lucide-react";
 import {
-  chanceOfRain,
-  COMPASS_SECTORS,
-  directionVotes,
-  intervalText,
-  providerRows,
+  rainText,
+  rangeText,
   sessionMessage,
   sessionWindowRows,
-  voteText,
+  sourceRows,
+  sourcesText,
 } from "../lib/dashboard.ts";
 import { formatClock, formatDayTime, formatValue } from "../lib/format.ts";
 import type { Session } from "../lib/sessions.ts";
-import { combineForecasts } from "../lib/stats.ts";
-import type { Track } from "../lib/types.ts";
+import { useFormat } from "../lib/settings.tsx";
+import { centreOf } from "../lib/sources.ts";
+import { combineWindow } from "../lib/stats.ts";
+import type { ForecastPoint, Track } from "../lib/types.ts";
 import { useForecast } from "../lib/use-data.ts";
+import { COMPASS_SECTORS, voteText } from "../lib/wind.ts";
 import { WINDOW } from "../lib/windows.ts";
 import {
   Card,
   Empty,
   Loading,
+  Notice,
   PageHeader,
   RefreshButton,
   Stat,
   Warnings,
 } from "./ui.tsx";
+import { trackSubtitle } from "./WeekendOverview.tsx";
 
 interface Props {
   track: Track;
@@ -40,15 +43,16 @@ export function SessionDashboard({
   onIndex,
   now,
 }: Props) {
-  const { data, refresh } = useForecast(track);
+  const { data, refresh, online } = useForecast(track);
   const session = sessions[index];
 
   return (
     <>
-      <PageHeader title={track.name} subtitle={track.country}>
+      <PageHeader title={track.name} subtitle={trackSubtitle(track)}>
         <RefreshButton
           fetchedAt={data.state === "ready" ? data.value.fetchedAt : undefined}
           onRefresh={refresh}
+          busy={data.state === "loading"}
         />
       </PageHeader>
 
@@ -62,7 +66,7 @@ export function SessionDashboard({
         >
           <ChevronLeft size={16} aria-hidden="true" /> Previous
         </button>
-        <div className="session-title">
+        <div className="session-title" aria-live="polite">
           <h2>{session.name}</h2>
           <span className="muted">
             {formatDayTime(session.start)} UTC · {index + 1} of{" "}
@@ -81,13 +85,30 @@ export function SessionDashboard({
       </div>
 
       {data.state === "loading" ? (
-        <Loading label="Fetching the forecasts" />
+        <Loading label="Fetching the forecasts" rows={2} />
       ) : data.state === "failed" ? (
-        <Empty>{data.message}</Empty>
+        <Empty
+          action={
+            <button type="button" className="button" onClick={refresh}>
+              Try again
+            </button>
+          }
+        >
+          {data.message}
+        </Empty>
       ) : (
         <>
-          <Warnings messages={data.value.failures} />
+          {data.value.saved ? (
+            <Notice>
+              {online ? "The weather services cannot be reached." : "Offline."}{" "}
+              Showing the forecast from {formatDayTime(data.value.fetchedAt)}{" "}
+              UTC.
+            </Notice>
+          ) : (
+            <Warnings messages={data.value.failures} />
+          )}
           <SessionWindow
+            track={track}
             session={session}
             points={data.value.points}
             now={now}
@@ -99,22 +120,26 @@ export function SessionDashboard({
 }
 
 function SessionWindow({
+  track,
   session,
   points,
   now,
 }: {
+  track: Track;
   session: Session;
-  points: Parameters<typeof combineForecasts>[0];
+  points: readonly ForecastPoint[];
   now: number;
 }) {
+  const format = useFormat();
   const rows = sessionWindowRows(points, session.start);
   const message = sessionMessage(session.start, now, rows);
   if (message) return <Empty>{message}</Empty>;
 
-  // Only this session's window: one entry with the means and their 95% interval.
-  const [window] = combineForecasts(rows);
-  const vote = directionVotes(rows);
-  const providers = providerRows(rows);
+  const centre = (source: string) => centreOf(source, track);
+  // Only this session's window: the middle value, the range and the votes.
+  const window = combineWindow(rows[0].time, rows, centre);
+  const groups = sourceRows(rows, centre);
+  const vote = window.direction;
   const windowText = `${formatClock(window.time)}–${formatClock(window.time + WINDOW)} UTC`;
 
   return (
@@ -126,18 +151,22 @@ function SessionWindow({
         <div className="stats">
           <Stat
             label="Temperature"
-            value={formatValue(window.temperature.mean, "°C")}
-            detail={intervalText(window.temperature, "°C")}
+            value={format.temperature(window.temperature.value)}
+            detail={rangeText(
+              window.temperature,
+              format.temperatureUnit,
+              format.temperatureNumber,
+            )}
           />
           <Stat
-            label="Chance of rain"
-            value={`${chanceOfRain(window).toFixed(0)}%`}
-            detail={`${window.rainProviders} of ${window.providers} predict rain`}
+            label="Rain"
+            value={formatValue(window.rain.value, "mm")}
+            detail={rainText(window)}
           />
           <Stat
             label="Wind"
-            value={formatValue(window.windKmh.mean, "km/h", 0)}
-            detail={intervalText(window.windKmh, "km/h", 0)}
+            value={format.wind(window.wind.value)}
+            detail={rangeText(window.wind, format.windUnit, format.windNumber)}
           />
           <Stat
             label="Wind from"
@@ -157,14 +186,16 @@ function SessionWindow({
             )}
           </Stat>
         </div>
+        <p className="card-foot muted">{sourcesText(window)}</p>
       </Card>
 
-      <Card title="By provider">
+      <Card title="By source">
         <div className="table-wrap">
           <table className="table">
             <thead>
               <tr>
-                <th scope="col">Provider</th>
+                <th scope="col">Source</th>
+                <th scope="col">Centre</th>
                 <th scope="col" className="num">
                   Temperature
                 </th>
@@ -178,27 +209,36 @@ function SessionWindow({
               </tr>
             </thead>
             <tbody>
-              {providers.map((row) => (
-                <tr key={row.source}>
-                  <th scope="row">{row.provider}</th>
-                  <td className="num">{formatValue(row.temperature, "°C")}</td>
-                  <td className="num">{formatValue(row.rain, "mm")}</td>
-                  <td className="num">{formatValue(row.windKmh, "km/h", 0)}</td>
-                  <td>{row.windFrom}</td>
-                </tr>
-              ))}
+              {groups.map((group) =>
+                group.rows.map((row) => (
+                  <tr key={row.source}>
+                    <th scope="row">
+                      {row.label}
+                      {row.via && <span className="via">{row.via}</span>}
+                    </th>
+                    <td className="centre">{group.centre}</td>
+                    <td className="num">
+                      {format.temperature(row.temperature)}
+                    </td>
+                    <td className="num">{formatValue(row.rain, "mm")}</td>
+                    <td className="num">{format.wind(row.windSpeed)}</td>
+                    <td>{row.windFrom ?? "–"}</td>
+                  </tr>
+                )),
+              )}
             </tbody>
             <tfoot>
               <tr>
                 <th scope="row">Combined</th>
-                <td className="num">
-                  {formatValue(window.temperature.mean, "°C")}
+                <td className="centre">
+                  {window.centres} centre{window.centres === 1 ? "" : "s"}
                 </td>
-                <td className="num">{formatValue(window.rain.mean, "mm")}</td>
                 <td className="num">
-                  {formatValue(window.windKmh.mean, "km/h", 0)}
+                  {format.temperature(window.temperature.value)}
                 </td>
-                <td>{vote ? vote.sector : "Unknown"}</td>
+                <td className="num">{formatValue(window.rain.value, "mm")}</td>
+                <td className="num">{format.wind(window.wind.value)}</td>
+                <td>{vote ? vote.sector : "–"}</td>
               </tr>
             </tfoot>
           </table>

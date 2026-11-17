@@ -34,7 +34,7 @@ const axis = {
 } as const;
 const margin = { top: 8, right: 12, bottom: 0, left: 0 };
 
-type Datum = { day: string } & Record<string, unknown>;
+export type Datum = { day: string } & Record<string, unknown>;
 
 function DayTooltip({
   active,
@@ -85,56 +85,66 @@ const legend = (series: Series[]) =>
     />
   ) : null;
 
+interface ChartProps {
+  data: Datum[];
+  series: Series[];
+  unit: string;
+  digits?: number;
+  /** Said to screen readers in place of the drawing. */
+  label: string;
+}
+
 export function DailyLines({
   data,
   series,
   unit,
   digits = 1,
   floorZero,
-}: {
-  data: Datum[];
-  series: Series[];
-  unit: string;
-  digits?: number;
-  floorZero?: boolean;
-}) {
+  label,
+}: ChartProps & { floorZero?: boolean }) {
   return (
-    <ResponsiveContainer width="100%" height={220}>
-      <LineChart data={data} margin={margin}>
-        <CartesianGrid vertical={false} stroke="var(--grid)" />
-        <XAxis
-          dataKey="day"
-          tickFormatter={formatIsoDay}
-          minTickGap={16}
-          {...axis}
-        />
-        <YAxis
-          width={36}
-          domain={floorZero ? [0, "auto"] : ["auto", "auto"]}
-          {...axis}
-        />
-        {legend(series)}
-        {series.map((item) => (
-          <Line
-            key={item.key}
-            dataKey={item.key}
-            name={item.label}
-            stroke={item.color}
-            strokeWidth={2}
-            strokeDasharray={item.dashed ? "4 3" : undefined}
-            dot={{ r: 2.5, strokeWidth: 0, fill: item.color }}
-            activeDot={{ r: 4, strokeWidth: 2, stroke: "var(--surface)" }}
-            isAnimationActive={false}
-            connectNulls
+    <div role="img" aria-label={label}>
+      <ResponsiveContainer width="100%" height={220}>
+        <LineChart data={data} margin={margin}>
+          <CartesianGrid vertical={false} stroke="var(--grid)" />
+          <XAxis
+            dataKey="day"
+            tickFormatter={formatIsoDay}
+            minTickGap={16}
+            {...axis}
           />
-        ))}
-        <Tooltip
-          content={<DayTooltip unit={unit} digits={digits} />}
-          cursor={{ stroke: "var(--border-strong)" }}
-          isAnimationActive={false}
-        />
-      </LineChart>
-    </ResponsiveContainer>
+          <YAxis
+            width={36}
+            domain={floorZero ? [0, "auto"] : ["auto", "auto"]}
+            {...axis}
+          />
+          {legend(series)}
+          {series.map((item) => (
+            <Line
+              key={item.key}
+              dataKey={item.key}
+              name={item.label}
+              stroke={item.color}
+              strokeWidth={2}
+              strokeDasharray={item.dashed ? "4 3" : undefined}
+              dot={
+                data.length > 45
+                  ? false
+                  : { r: 2.5, strokeWidth: 0, fill: item.color }
+              }
+              activeDot={{ r: 4, strokeWidth: 2, stroke: "var(--surface)" }}
+              isAnimationActive={false}
+              connectNulls
+            />
+          ))}
+          <Tooltip
+            content={<DayTooltip unit={unit} digits={digits} />}
+            cursor={{ stroke: "var(--border-strong)" }}
+            isAnimationActive={false}
+          />
+        </LineChart>
+      </ResponsiveContainer>
+    </div>
   );
 }
 
@@ -144,48 +154,46 @@ export function DailyBars({
   series,
   unit,
   digits = 1,
-}: {
-  data: Datum[];
-  series: Series[];
-  unit: string;
-  digits?: number;
-}) {
+  label,
+}: ChartProps) {
   const floating = series.some((item) =>
     data.some((row) => Array.isArray(row[item.key])),
   );
   return (
-    <ResponsiveContainer width="100%" height={220}>
-      <BarChart data={data} margin={margin} barGap={2} barCategoryGap="20%">
-        <CartesianGrid vertical={false} stroke="var(--grid)" />
-        <XAxis
-          dataKey="day"
-          tickFormatter={formatIsoDay}
-          minTickGap={16}
-          {...axis}
-        />
-        <YAxis
-          width={36}
-          domain={floating ? ["auto", "auto"] : [0, "auto"]}
-          {...axis}
-        />
-        {legend(series)}
-        {series.map((item) => (
-          <Bar
-            key={item.key}
-            dataKey={item.key}
-            name={item.label}
-            fill={item.color}
-            radius={[3, 3, 3, 3]}
-            maxBarSize={28}
+    <div role="img" aria-label={label}>
+      <ResponsiveContainer width="100%" height={220}>
+        <BarChart data={data} margin={margin} barGap={2} barCategoryGap="20%">
+          <CartesianGrid vertical={false} stroke="var(--grid)" />
+          <XAxis
+            dataKey="day"
+            tickFormatter={formatIsoDay}
+            minTickGap={16}
+            {...axis}
+          />
+          <YAxis
+            width={36}
+            domain={floating ? ["auto", "auto"] : [0, "auto"]}
+            {...axis}
+          />
+          {legend(series)}
+          {series.map((item) => (
+            <Bar
+              key={item.key}
+              dataKey={item.key}
+              name={item.label}
+              fill={item.color}
+              radius={data.length > 45 ? 1 : 3}
+              maxBarSize={28}
+              isAnimationActive={false}
+            />
+          ))}
+          <Tooltip
+            content={<DayTooltip unit={unit} digits={digits} />}
+            cursor={{ fill: "var(--hover)" }}
             isAnimationActive={false}
           />
-        ))}
-        <Tooltip
-          content={<DayTooltip unit={unit} digits={digits} />}
-          cursor={{ fill: "var(--hover)" }}
-          isAnimationActive={false}
-        />
-      </BarChart>
-    </ResponsiveContainer>
+        </BarChart>
+      </ResponsiveContainer>
+    </div>
   );
 }

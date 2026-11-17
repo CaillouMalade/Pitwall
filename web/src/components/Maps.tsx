@@ -2,13 +2,26 @@ import { useEffect, useRef, useState } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { formatClock } from "../lib/format.ts";
+import { readText, writeText } from "../lib/storage.ts";
 import type { RadarFrame, Track } from "../lib/types.ts";
 import type { Loadable } from "../lib/use-data.ts";
-import { Card, Empty, Loading } from "./ui.tsx";
+import { Card, Segmented } from "./ui.tsx";
 
+// Sentinel-2 cloudless by EOX: 10 m imagery, free for non-commercial use.
 const SATELLITE =
-  "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}";
+  "https://tiles.maps.eox.at/wmts/1.0.0/s2cloudless-2024_3857/default/g/{z}/{y}/{x}.jpg";
+const SATELLITE_CREDIT =
+  '<a href="https://s2maps.eu/">Sentinel-2 cloudless</a> by EOX IT Services GmbH (contains modified Copernicus Sentinel data 2024)';
 const STREETS = "https://tile.openstreetmap.org/{z}/{x}/{y}.png";
+const STREETS_CREDIT =
+  '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors';
+
+const MAP_VIEW_KEY = "pitwall-map";
+type View = "satellite" | "map";
+const VIEWS = [
+  { value: "satellite", label: "Satellite" },
+  { value: "map", label: "Map" },
+] as const;
 
 /** A Leaflet map that lives as long as its element, re-centred on every track. */
 function useMap(
@@ -57,18 +70,54 @@ function useMap(
 }
 
 export function CircuitMap({ track }: { track: Track }) {
-  const [element] = useMap(track, 14, (map) => {
-    L.tileLayer(SATELLITE, {
-      maxZoom: 18,
-      attribution: '<a href="https://www.esri.com/">Esri</a> World Imagery',
-    }).addTo(map);
+  const [view, setView] = useState<View>(() =>
+    readText(MAP_VIEW_KEY) === "map" ? "map" : "satellite",
+  );
+  const [element, map] = useMap(track, 14, (created) => {
+    created.setMaxZoom(17).setMinZoom(8);
   });
+
+  useEffect(() => {
+    if (!map) return;
+    const layer =
+      view === "satellite"
+        ? L.tileLayer(SATELLITE, {
+            // The imagery is 10 m a pixel; closer in it is enlarged.
+            maxNativeZoom: 14,
+            maxZoom: 17,
+            attribution: SATELLITE_CREDIT,
+          })
+        : L.tileLayer(STREETS, {
+            maxZoom: 17,
+            className: "base-tiles",
+            attribution: STREETS_CREDIT,
+          });
+    layer.addTo(map);
+    return () => {
+      layer.remove();
+    };
+  }, [map, view]);
+
   return (
-    <Card title="Circuit" className="map-card">
+    <Card
+      title="Circuit"
+      className="map-card"
+      aside={
+        <Segmented<View>
+          label="Circuit view"
+          value={view}
+          options={VIEWS}
+          onChange={(value) => {
+            setView(value);
+            writeText(MAP_VIEW_KEY, value);
+          }}
+        />
+      }
+    >
       <div
         ref={element}
         className="map"
-        aria-label={`Satellite view of ${track.name}`}
+        aria-label={`${view === "satellite" ? "Satellite view" : "Map"} of ${track.name}`}
         role="img"
       />
     </Card>
@@ -87,8 +136,7 @@ export function RadarMap({
       maxZoom: 10,
       minZoom: 3,
       className: "base-tiles",
-      attribution:
-        '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+      attribution: STREETS_CREDIT,
     }).addTo(created);
     created.setMaxZoom(10).setMinZoom(3);
   });
@@ -105,7 +153,8 @@ export function RadarMap({
     const layer = L.tileLayer(frame.url, {
       opacity: 0.75,
       maxNativeZoom: 7,
-      attribution: '<a href="https://www.rainviewer.com/">RainViewer</a>',
+      attribution:
+        'Weather data by <a href="https://www.rainviewer.com/">RainViewer</a>',
     }).addTo(map);
     return () => {
       layer.remove();
@@ -129,9 +178,15 @@ export function RadarMap({
           aria-label={`Rain radar around ${track.name}`}
           role="img"
         />
-        {radar.state === "loading" && <Loading label="Loading the radar" />}
+        {radar.state === "loading" && (
+          <p className="map-note" role="status">
+            Loading the radar
+          </p>
+        )}
         {radar.state === "failed" && (
-          <Empty>No rain radar right now: {radar.message}</Empty>
+          <p className="map-note" role="status">
+            No rain radar right now: {radar.message}
+          </p>
         )}
       </div>
       {frames.length > 1 && (
