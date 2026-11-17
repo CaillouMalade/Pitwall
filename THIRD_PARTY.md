@@ -2,23 +2,33 @@
 
 Pitwall's MIT licence covers its original application code and documentation. It does not replace the licences or service conditions for dependencies or external data.
 
+This page is the list of credits. What each service's terms allow, with links to the pages that were read, is in [docs/DATA_SOURCES.md](docs/DATA_SOURCES.md).
+
 The desktop build also bundles Electron and Chromium/Node. Their distributed `ELECTRON_LICENSE.txt` and `CHROMIUM_LICENSES.html` notices are retained in the app bundle alongside web dependency notices. Packaging tools are development dependencies, not shipped application dependencies.
 
-## Weather
+## Forecasts
 
-- **Open-Meteo:** data under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). The free service is for non-commercial use within its quotas; see the [current terms](https://open-meteo.com/en/terms).
-- **MET Norway:** data © Norwegian Meteorological Institute (MET Norway), under its [licensing and data policy](https://docs.api.met.no/doc/License.html) (CC BY 4.0 / NLOD 2.0). Its [terms of service](https://docs.api.met.no/doc/TermsOfService.html) also apply; the desktop app identifies itself to MET with a User-Agent.
-- Pitwall converts units, sums hourly rain into 3-hour windows and keeps missing values missing.
+- **Open-Meteo:** weather data by [Open-Meteo.com](https://open-meteo.com/) under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). Through it Pitwall shows models of ECMWF, NOAA, Deutscher Wetterdienst, Météo-France, the UK Met Office, Environment and Climate Change Canada, the Japan Meteorological Agency, the China Meteorological Administration, KNMI, MeteoSwiss and ItaliaMeteo. The free service is for non-commercial use within its quotas; see the [terms](https://open-meteo.com/en/terms).
+- **MET Norway:** data from MET Norway, under [NLOD 2.0 and CC BY 4.0](https://api.met.no/doc/License). Its [terms of service](https://api.met.no/doc/TermsOfService) also apply.
+- **Deutscher Wetterdienst:** MOSMIX forecast, source Deutscher Wetterdienst, under [CC BY 4.0](https://www.dwd.de/EN/service/legal_notice/legal_notice.html), served by [Bright Sky](https://brightsky.dev/).
+- **US National Weather Service:** forecast data from the [National Weather Service](https://www.weather.gov/documentation/services-web-api), in the public domain. Pitwall is not endorsed by or affiliated with NOAA or the NWS.
+- **SMHI:** source SMHI, under [CC BY 4.0 SE](https://www.smhi.se/data/om-smhis-data/villkor-for-anvandning).
+- **Finnish Meteorological Institute:** open data under [CC BY 4.0](https://en.ilmatieteenlaitos.fi/open-data-licence).
+- **Danish Meteorological Institute:** open data under [CC BY 4.0](https://www.dmi.dk/friedata/dokumentation/terms-of-use).
+- **GeoSphere Austria:** data under [CC BY 4.0](https://dataset.api.hub.geosphere.at/v1/docs/user-guide/license.html).
 
-## Logged weather
+Pitwall changes this data before showing it: it converts units, turns hourly values into 3-hour windows, keeps missing values missing, merges sources of the same forecasting centre and combines the centres. See [docs/METHOD.md](docs/METHOD.md).
 
-`web/src/data/observed-weather.csv` holds the weather logged every 30 minutes at each track from 29 October to 13 November 2026 (time, track, temperature and the last hour's rain), used by the History and Track comparison pages. It was collected for the original racetrack weather project from OpenWeatherMap's current-weather service; OpenWeatherMap data are under [CC BY-SA 4.0](https://openweathermap.org/full-price#licenses), and this file keeps that licence.
+## Past weather
+
+- **Open-Meteo Historical Weather API:** ERA5, ERA5-Land and ECMWF IFS reanalysis, by [Open-Meteo.com](https://open-meteo.com/en/docs/historical-weather-api) under CC BY 4.0. Generated using Copernicus Climate Change Service information.
+- **Bundled log:** `web/src/data/observed-weather.csv` holds the weather logged every 30 minutes at each track from 29 October to 13 November 2026 (time, track, temperature and the last hour's rain), shown when the archive cannot be reached. It was collected for the original racetrack weather project from OpenWeather's current-weather service. Weather data © [OpenWeather](https://openweathermap.org/), under the [Open Database License 1.0](https://opendatacommons.org/licenses/odbl/1-0/); this file is offered under the same licence.
 
 ## Radar and mapping
 
-- **RainViewer:** recent radar tiles from its [Weather Maps API](https://www.rainviewer.com/api/weather-maps-api.html). RainViewer attribution stays on the map.
-- **OpenStreetMap:** base tiles © OpenStreetMap contributors, under [ODbL 1.0](https://www.openstreetmap.org/copyright). The [tile usage policy](https://operations.osmfoundation.org/policies/tiles/) applies; Pitwall does not bulk-download or precache tiles.
-- **Esri World Imagery:** satellite tiles for the circuit view, © Esri and its data providers, shown with attribution under Esri's [terms of use](https://www.esri.com/en-us/legal/terms/full-master-agreement).
+- **RainViewer:** weather data by [RainViewer](https://www.rainviewer.com/), from its [Weather Maps API](https://www.rainviewer.com/api/weather-maps-api.html). The credit stays on the map.
+- **OpenStreetMap:** base tiles © OpenStreetMap contributors, data under [ODbL 1.0](https://www.openstreetmap.org/copyright). The [tile usage policy](https://operations.osmfoundation.org/policies/tiles/) applies; Pitwall does not bulk-download or precache tiles.
+- **Sentinel-2 cloudless:** [https://s2maps.eu](https://s2maps.eu) by EOX IT Services GmbH (contains modified Copernicus Sentinel data 2024), under [CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/) for non-commercial use.
 
 Track names are descriptive; Pitwall does not claim affiliation with circuits, championships, weather agencies or map providers.
 
