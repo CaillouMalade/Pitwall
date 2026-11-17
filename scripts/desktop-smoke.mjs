@@ -72,7 +72,8 @@ try {
     assert.equal(report.sandbox, true);
     assert.equal(report.persisted, true);
     assert.equal(report.appearanceRetained, true);
-    assert.equal(report.indexedDB, true);
+    assert.equal(report.providersFailedGracefully, true);
+    assert.equal(report.historyLoaded, true);
     console.log(
       JSON.stringify({ launch: reopen ? "reopen" : "first", ...report }),
     );

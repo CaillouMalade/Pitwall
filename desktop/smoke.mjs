@@ -2,54 +2,40 @@ import { app } from "electron";
 import { writeFile } from "node:fs/promises";
 
 // Invoked only by the explicit local/CI --pitwall-test launch. No renderer API is exposed.
+// Outside requests are blocked during this check, so both providers must fail with
+// a visible warning while the app itself keeps working.
 export async function packagedSmoke(window, origin) {
   const report = await window.webContents.executeJavaScript(`(async () => {
     const waitFor = async (predicate) => {
-      for (let i = 0; i < 100 && !predicate(); i++)
+      for (let i = 0; i < 150 && !predicate(); i++)
         await new Promise(resolve => setTimeout(resolve, 100));
       return Boolean(predicate());
     };
-    const rendered = () => ['Dashboard', 'Sessions', 'Models', 'History'].every(label =>
-      [...document.querySelectorAll('nav[aria-label="Weather views"] button')].some(button => button.textContent === label));
-    await waitFor(() => rendered() && !document.body.innerText.includes('Use Pitwall as an app'));
+    const pages = ['Weekend overview', 'Session dashboard', 'History', 'Track comparison'];
+    const rendered = () => pages.every(label =>
+      [...document.querySelectorAll('nav[aria-label="Pages"] button')].some(button => button.textContent === label));
+    await waitFor(rendered);
+    const warned = await waitFor(() =>
+      ['Skipped Open-Meteo', 'Skipped MET Norway'].every(text => document.body.innerText.includes(text)));
     const reopen = ${JSON.stringify(process.env.PITWALL_SMOKE_REOPEN === "1")};
     const previous = localStorage.getItem('pitwall-desktop-smoke');
     if (!reopen) {
       localStorage.setItem('pitwall-desktop-smoke', 'retained');
-      // Choose through React's controls so its initial system-preference effect
-      // cannot race a test-only localStorage write and remove the preference.
-      document.querySelector('.header-actions button[aria-label="Weather preferences"]').click();
-      await waitFor(() => document.querySelector('[aria-labelledby="appearance-label"]'));
-      [...document.querySelectorAll('[aria-labelledby="appearance-label"] button')]
-        .find(button => button.textContent === 'Dark').click();
+      document.querySelector('[role="radiogroup"][aria-label="Appearance"] [aria-label="Dark"]').click();
       await waitFor(() => localStorage.getItem('pitwall-theme') === 'dark' && document.documentElement.dataset.theme === 'dark');
-      [...document.querySelectorAll('[role="dialog"] button')]
-        .find(button => button.textContent.trim() === 'Done').click();
-      await waitFor(() => !document.querySelector('[role="dialog"]'));
     }
-    const dbWorks = await new Promise(resolve => {
-      const request = indexedDB.open('pitwall-desktop-smoke', 1);
-      request.onupgradeneeded = () => request.result.createObjectStore('checks');
-      request.onsuccess = () => {
-        const db = request.result;
-        const transaction = db.transaction('checks', reopen ? 'readonly' : 'readwrite');
-        const store = transaction.objectStore('checks');
-        let valid = !reopen;
-        if (reopen) store.get('saved').onsuccess = event => { valid = event.target.result === 'retained'; };
-        else store.put('retained', 'saved');
-        transaction.oncomplete = () => { db.close(); resolve(valid); };
-        transaction.onerror = () => { db.close(); resolve(false); };
-      };
-      request.onerror = () => resolve(false);
-    });
+    // Red Bull Ring, the first track, has no logged history yet; Monza does.
+    [...document.querySelectorAll('ul[aria-label="Tracks"] button')].find(button => button.textContent.startsWith('Monza')).click();
+    [...document.querySelectorAll('nav[aria-label="Pages"] button')].find(button => button.textContent === 'History').click();
+    const history = await waitFor(() => document.body.innerText.includes('Days logged'));
     return {
       title: document.title,
       rendered: rendered(),
+      providersFailedGracefully: warned,
+      historyLoaded: history,
       appearanceRetained: localStorage.getItem('pitwall-theme') === 'dark' && document.documentElement.dataset.theme === 'dark',
       desktop: window.pitwallDesktop?.isDesktop === true,
       nodeUnavailable: typeof require === 'undefined' && typeof process === 'undefined',
-      installButtonHidden: !document.body.innerText.includes('Use Pitwall as an app'),
-      indexedDB: dbWorks,
       persisted: !reopen || previous === 'retained',
       origin: location.origin
     };
@@ -68,10 +54,10 @@ export async function packagedSmoke(window, origin) {
   );
   if (
     !report.rendered ||
+    !report.providersFailedGracefully ||
+    !report.historyLoaded ||
     !report.desktop ||
     !report.nodeUnavailable ||
-    !report.installButtonHidden ||
-    !report.indexedDB ||
     !report.persisted ||
     !report.appearanceRetained ||
     !report.sandbox ||
