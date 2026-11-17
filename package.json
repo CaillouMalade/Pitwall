@@ -1,9 +1,9 @@
 {
   "name": "pitwall-weather",
-  "version": "3.0.0-preview.0",
+  "version": "3.0.0-preview.1",
   "license": "MIT",
   "private": true,
-  "description": "Racetrack weather for a race weekend: combined forecasts, rain radar and logged history",
+  "description": "Racetrack weather for a race weekend: many forecast sources combined, rain radar and past weather",
   "type": "module",
   "main": "desktop/main.mjs",
   "engines": {

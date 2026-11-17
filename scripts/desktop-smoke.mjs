@@ -68,6 +68,7 @@ try {
     const report = JSON.parse(await readFile(output, "utf8"));
     assert.equal(report.packaged, packaged);
     assert.equal(report.rendered, true);
+    assert.equal(report.setupOnlyOnFirstLaunch, true);
     assert.equal(report.nodeUnavailable, true);
     assert.equal(report.sandbox, true);
     assert.equal(report.persisted, true);

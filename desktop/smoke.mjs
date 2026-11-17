@@ -2,8 +2,9 @@ import { app } from "electron";
 import { writeFile } from "node:fs/promises";
 
 // Invoked only by the explicit local/CI --pitwall-test launch. No renderer API is exposed.
-// Outside requests are blocked during this check, so both providers must fail with
-// a visible warning while the app itself keeps working.
+// Outside requests are blocked during this check, so every service must fail
+// with a visible warning while the app itself keeps working: the first-run
+// set-up, the settings, and the History page from the bundled log.
 export async function packagedSmoke(window, origin) {
   const report = await window.webContents.executeJavaScript(`(async () => {
     const waitFor = async (predicate) => {
@@ -15,22 +16,38 @@ export async function packagedSmoke(window, origin) {
     const rendered = () => pages.every(label =>
       [...document.querySelectorAll('nav[aria-label="Pages"] button')].some(button => button.textContent === label));
     await waitFor(rendered);
-    const warned = await waitFor(() =>
-      ['Skipped Open-Meteo', 'Skipped MET Norway'].every(text => document.body.innerText.includes(text)));
     const reopen = ${JSON.stringify(process.env.PITWALL_SMOKE_REOPEN === "1")};
     const previous = localStorage.getItem('pitwall-desktop-smoke');
+    const button = (label, root = document) =>
+      [...root.querySelectorAll('button')].find(item => item.textContent.trim() === label);
+    // The first launch opens the set-up; the second must not.
+    const setup = () => document.querySelector('dialog[open]');
+    // The dialog opens just after the page is drawn, so give it a moment.
+    const setupShown = reopen
+      ? (await new Promise(resolve => setTimeout(resolve, 1000)), Boolean(setup()))
+      : await waitFor(() => setup());
     if (!reopen) {
       localStorage.setItem('pitwall-desktop-smoke', 'retained');
-      document.querySelector('[role="radiogroup"][aria-label="Appearance"] [aria-label="Dark"]').click();
+      button('Continue', setup()).click();
+      await waitFor(() => !setup());
+      button('Settings').click();
+      await waitFor(() => setup());
+      [...setup().querySelectorAll('[role="radiogroup"][aria-label="Appearance"] button')]
+        .find(item => item.textContent.trim() === 'Dark').click();
       await waitFor(() => localStorage.getItem('pitwall-theme') === 'dark' && document.documentElement.dataset.theme === 'dark');
+      setup().querySelector('button[aria-label="Close"]').click();
+      await waitFor(() => !setup());
     }
-    // Red Bull Ring, the first track, has no logged history yet; Monza does.
-    [...document.querySelectorAll('ul[aria-label="Tracks"] button')].find(button => button.textContent.startsWith('Monza')).click();
-    [...document.querySelectorAll('nav[aria-label="Pages"] button')].find(button => button.textContent === 'History').click();
-    const history = await waitFor(() => document.body.innerText.includes('Days logged'));
+    const warned = await waitFor(() =>
+      ['Skipped Open-Meteo', 'Skipped MET Norway'].every(text => document.body.innerText.includes(text)));
+    // Red Bull Ring, the first track, has too little in the bundled log; Monza has days of it.
+    [...document.querySelectorAll('ul[aria-label="Tracks"] button')].find(item => item.textContent.startsWith('Monza')).click();
+    [...document.querySelectorAll('nav[aria-label="Pages"] button')].find(item => item.textContent === 'History').click();
+    const history = await waitFor(() => document.body.innerText.includes('Showing the log that comes with Pitwall'));
     return {
       title: document.title,
       rendered: rendered(),
+      setupOnlyOnFirstLaunch: setupShown === !reopen,
       providersFailedGracefully: warned,
       historyLoaded: history,
       appearanceRetained: localStorage.getItem('pitwall-theme') === 'dark' && document.documentElement.dataset.theme === 'dark',
@@ -54,6 +71,7 @@ export async function packagedSmoke(window, origin) {
   );
   if (
     !report.rendered ||
+    !report.setupOnlyOnFirstLaunch ||
     !report.providersFailedGracefully ||
     !report.historyLoaded ||
     !report.desktop ||

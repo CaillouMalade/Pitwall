@@ -18,6 +18,38 @@ const types = {
   ".txt": "text/plain; charset=utf-8",
 };
 
+// The only outside addresses the app may reach: the forecast, archive and radar
+// services, and the map tiles. Everything else is refused by the browser.
+const forecastServices = [
+  "https://api.open-meteo.com",
+  "https://archive-api.open-meteo.com",
+  "https://api.met.no",
+  "https://api.brightsky.dev",
+  "https://api.weather.gov",
+  "https://opendata-download-metfcst.smhi.se",
+  "https://opendata.fmi.fi",
+  "https://opendataapi.dmi.dk",
+  "https://dataset.api.hub.geosphere.at",
+  "https://api.rainviewer.com",
+];
+const mapTiles = [
+  "https://tile.openstreetmap.org",
+  "https://tiles.maps.eox.at",
+  "https://*.rainviewer.com",
+];
+export const contentSecurityPolicy = [
+  "default-src 'self'",
+  "script-src 'self'",
+  "style-src 'self' 'unsafe-inline'",
+  `img-src 'self' data: ${mapTiles.join(" ")}`,
+  `connect-src 'self' ${forecastServices.join(" ")}`,
+  "font-src 'self'",
+  "object-src 'none'",
+  "base-uri 'self'",
+  "form-action 'none'",
+  "frame-ancestors 'none'",
+].join("; ");
+
 /** Serve built application files only, never the repository or private environment. */
 export function createAppServer(directory = path.join(projectRoot, "dist")) {
   const root = path.resolve(directory);
@@ -28,10 +60,7 @@ export function createAppServer(directory = path.join(projectRoot, "dist")) {
       "Permissions-Policy",
       "camera=(), microphone=(), geolocation=(), payment=()",
     );
-    response.setHeader(
-      "Content-Security-Policy",
-      "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://tile.openstreetmap.org https://server.arcgisonline.com https://*.rainviewer.com; connect-src 'self' https://api.open-meteo.com https://api.met.no https://api.rainviewer.com; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'; frame-ancestors 'none'",
-    );
+    response.setHeader("Content-Security-Policy", contentSecurityPolicy);
     const send = (status, body, type = "text/plain; charset=utf-8") => {
       response.writeHead(status, {
         "Content-Type": type,

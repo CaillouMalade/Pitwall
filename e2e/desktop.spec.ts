@@ -29,7 +29,7 @@ const test = browserTest.extend<{ desktopApp: ElectronApplication }>({
   context: async ({ desktopApp }, provide) => {
     await provide(desktopApp.context());
   },
-  page: async ({ desktopApp, providers: _providers }, provide) => {
+  page: async ({ desktopApp, services: _services }, provide) => {
     const page = await desktopApp.firstWindow();
     await page.clock.setFixedTime(new Date("2026-11-17T09:20:00Z"));
     await provide(page);
@@ -38,19 +38,32 @@ const test = browserTest.extend<{ desktopApp: ElectronApplication }>({
 
 test("the desktop app loads forecasts, sessions and history", async ({
   page,
-  providers,
+  services,
 }) => {
   await page.goto("http://localhost:4175/");
   await expect(
     page.getByRole("region", { name: "Rain and temperature" }),
   ).toBeVisible();
   await expect(page.getByText(/^Skipped/)).toHaveCount(0);
-  expect(providers.requests).toEqual(
-    expect.arrayContaining(["api.open-meteo.com", "api.met.no"]),
+  await expect(
+    page
+      .getByRole("region", { name: "Sources" })
+      .getByText("12 of 18 answered"),
+  ).toBeVisible();
+  expect(services.requests).toEqual(
+    expect.arrayContaining([
+      "api.open-meteo.com",
+      "api.met.no",
+      "api.brightsky.dev",
+    ]),
   );
   await openPage(page, "Session dashboard");
-  await expect(page.getByText("2 of 2 agree")).toBeVisible();
+  await expect(page.getByText("9 of 9 agree")).toBeVisible();
   await selectTrack(page, "Monza");
   await openPage(page, "History");
-  await expect(page.getByText("Days logged")).toBeVisible();
+  await expect(page.getByRole("region", { name: "Summary" })).toBeVisible();
+  await page.getByRole("button", { name: "About" }).click();
+  await expect(
+    page.getByRole("dialog", { name: "About Pitwall" }).getByText(/^Version /),
+  ).toBeVisible();
 });

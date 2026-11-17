@@ -1,10 +1,17 @@
+// The pages the About screen links to. Any other link is not opened.
 const externalHosts = new Set([
   "open-meteo.com",
-  "www.met.no",
   "api.met.no",
+  "www.dwd.de",
+  "www.weather.gov",
+  "www.smhi.se",
+  "en.ilmatieteenlaitos.fi",
+  "www.dmi.dk",
+  "data.hub.geosphere.at",
   "www.rainviewer.com",
   "www.openstreetmap.org",
-  "www.esri.com",
+  "s2maps.eu",
+  "openweathermap.org",
 ]);
 
 export function externalLink(value) {

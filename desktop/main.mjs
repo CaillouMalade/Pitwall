@@ -1,4 +1,14 @@
-import { app, BrowserWindow, dialog, Menu, session, shell } from "electron";
+import {
+  app,
+  BrowserWindow,
+  dialog,
+  Menu,
+  nativeTheme,
+  screen,
+  session,
+  shell,
+} from "electron";
+import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { startDesktopServer } from "./server.mjs";
@@ -50,15 +60,53 @@ async function openExternal(value) {
   if (url) await shell.openExternal(url);
 }
 
+const DEFAULT_SIZE = { width: 1280, height: 860 };
+const MIN_SIZE = { width: 900, height: 620 };
+const windowStateFile = () => path.join(app.getPath("userData"), "window.json");
+
+/**
+ * Where the window was last time, if that is still on a screen; otherwise a
+ * default size that fits the screen the pointer is on.
+ */
+async function windowBounds() {
+  try {
+    const saved = JSON.parse(await readFile(windowStateFile(), "utf8"));
+    const { x, y, width, height } = saved;
+    if (
+      [x, y, width, height].every(Number.isInteger) &&
+      width >= MIN_SIZE.width &&
+      height >= MIN_SIZE.height
+    ) {
+      const area = screen.getDisplayMatching({ x, y, width, height }).workArea;
+      const visible =
+        x < area.x + area.width - 100 &&
+        x + width > area.x + 100 &&
+        y >= area.y - 10 &&
+        y < area.y + area.height - 100;
+      if (visible) return { x, y, width, height, maximized: !!saved.maximized };
+    }
+  } catch {
+    /* No saved window yet, or an unreadable file: use the default. */
+  }
+  const { workAreaSize } = screen.getDisplayNearestPoint(
+    screen.getCursorScreenPoint(),
+  );
+  return {
+    width: Math.min(DEFAULT_SIZE.width, workAreaSize.width),
+    height: Math.min(DEFAULT_SIZE.height, workAreaSize.height),
+    maximized: false,
+  };
+}
+
 async function createWindow() {
   if (!server) return;
+  const { maximized, ...bounds } = await windowBounds();
   mainWindow = new BrowserWindow({
     title: identity.name,
-    width: 1440,
-    height: 1000,
-    minWidth: 800,
-    minHeight: 600,
-    backgroundColor: "#f7f7f5",
+    ...bounds,
+    minWidth: MIN_SIZE.width,
+    minHeight: MIN_SIZE.height,
+    backgroundColor: nativeTheme.shouldUseDarkColors ? "#111111" : "#f7f7f5",
     show: false,
     autoHideMenuBar: process.platform !== "darwin",
     webPreferences: {
@@ -72,6 +120,18 @@ async function createWindow() {
     },
   });
   const window = mainWindow;
+  if (maximized) window.maximize();
+  window.on("close", () => {
+    if (testing) return;
+    // Best effort: a window that cannot be remembered opens at the default.
+    void writeFile(
+      windowStateFile(),
+      JSON.stringify({
+        ...window.getNormalBounds(),
+        maximized: window.isMaximized(),
+      }),
+    ).catch(() => {});
+  });
   window.on("page-title-updated", (event) => {
     event.preventDefault();
     window.setTitle(identity.name);
@@ -124,7 +184,7 @@ async function start() {
     applicationVersion: app.getVersion(),
     website: "https://github.com/Arthur-Brht/pitwall",
     copyright:
-      "MIT licensed software. Weather and map data retain their own terms.",
+      "Free software under the MIT licence. Weather and map data keep their own terms.",
   });
   session.defaultSession.setPermissionRequestHandler(
     (_contents, _permission, callback) => callback(false),
@@ -134,16 +194,15 @@ async function start() {
     if (!server || !isAppDownload(item.getURL(), server.origin))
       event.preventDefault();
   });
-  // MET Norway asks every client to identify itself. Browsers cannot set this
-  // header, so the desktop app adds it for MET requests only.
+  // MET Norway, the US National Weather Service and OpenStreetMap ask every
+  // client to name itself. Browsers cannot set this header, so the desktop app
+  // sets it on every request that leaves the computer.
+  const userAgent = `Pitwall/${app.getVersion()} (+https://github.com/Arthur-Brht/pitwall)`;
   session.defaultSession.webRequest.onBeforeSendHeaders(
-    { urls: ["https://api.met.no/*"] },
+    { urls: ["https://*/*"] },
     (details, callback) =>
       callback({
-        requestHeaders: {
-          ...details.requestHeaders,
-          "User-Agent": `Pitwall/${app.getVersion()} github.com/Arthur-Brht/pitwall`,
-        },
+        requestHeaders: { ...details.requestHeaders, "User-Agent": userAgent },
       }),
   );
   if (testing && process.env.PITWALL_SMOKE_OUTPUT)
@@ -216,11 +275,13 @@ async function start() {
 async function fatal(error) {
   if (testing) {
     console.error(error);
-    process.exitCode = 1;
-  } else
-    dialog.showErrorBox(
-      "Pitwall could not open",
-      "Please reopen Pitwall. If this continues, reinstall it from the original download.",
-    );
+    // app.quit() would end with code 0 and hide the failure from the check.
+    app.exit(1);
+    return;
+  }
+  dialog.showErrorBox(
+    "Pitwall could not open",
+    "Please reopen Pitwall. If this continues, reinstall it from the original download.",
+  );
   app.quit();
 }

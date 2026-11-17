@@ -14,6 +14,7 @@ export default defineConfig({
     : [["list"]],
   use: {
     baseURL: "http://localhost:4174",
+    locale: "en-GB",
     trace: "retain-on-failure",
     screenshot: "only-on-failure",
     video: "retain-on-failure",

@@ -26,6 +26,10 @@ for (const relative of [
   "scripts/start.mjs",
   "LICENSE",
   "THIRD_PARTY.md",
+  "docs/DATA_SOURCES.md",
+  "docs/METHOD.md",
+  "docs/PRIVACY.md",
+  "docs/EULA.md",
 ]) {
   await mkdir(path.dirname(path.join(stage, relative)), { recursive: true });
   await cp(path.join(root, relative), path.join(stage, relative));
