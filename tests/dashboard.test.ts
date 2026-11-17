@@ -1,22 +1,28 @@
 // The page helpers on the invented forecast. Its 8 windows are Friday 13 November
-// 2026, 00:00 to 21:00 UTC, and every provider says 225° (SW).
+// 2026, 00:00 to 21:00 UTC, and every source says 225° (SW).
 
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
-  chanceOfRain,
-  compassSector,
-  directionVotes,
-  intervalText,
-  providerRows,
+  rainText,
+  rangeText,
   sessionMessage,
   sessionWindowRows,
-  voteText,
+  sourceRows,
+  sourcesText,
 } from "../web/src/lib/dashboard.ts";
-import { combineForecasts } from "../web/src/lib/stats.ts";
+import { niceTicks, unitFormat } from "../web/src/lib/format.ts";
+import { combineForecasts, combineWindow } from "../web/src/lib/stats.ts";
+import {
+  compassSector,
+  directionVote,
+  meanDirection,
+  voteText,
+} from "../web/src/lib/wind.ts";
 import { fakeTable, utc } from "./helpers.ts";
 
 const FP1 = utc(2026, 11, 13, 8); // in the 06:00 window
+const metric = unitFormat({ temperature: "c", wind: "kmh" });
 
 test("compass sector of the main directions", () => {
   assert.equal(compassSector(0), "N");
@@ -32,31 +38,26 @@ test("compass sector on both sides of north", () => {
   assert.equal(compassSector(360), "N");
 });
 
-test("direction votes on the fake forecast", () => {
-  const vote = directionVotes(sessionWindowRows(fakeTable(), FP1));
-  assert.deepEqual(vote, { sector: "SW", agreeing: 3, providers: 3 });
-  assert.equal(voteText(vote!), "3 of 3 agree");
-});
-
-test("direction votes with a disagreement and a missing value", () => {
-  const rows = [350, 10, 90, null].map((windDeg) => ({ windDeg }));
-  // Two providers say N, one says E, one sent no direction.
-  assert.deepEqual(directionVotes(rows), {
+test("direction vote with a disagreement and a missing value", () => {
+  // Two say N, one says E, one sent no direction.
+  assert.deepEqual(directionVote([350, 10, 90, null]), {
     sector: "N",
     agreeing: 2,
-    providers: 3,
+    of: 3,
   });
+  assert.equal(voteText(directionVote([225, 225, 225])!), "3 of 3 agree");
 });
 
-test("direction votes with no direction", () => {
-  assert.equal(directionVotes([{ windDeg: null }, { windDeg: null }]), null);
+test("direction vote with no direction", () => {
+  assert.equal(directionVote([null, null]), null);
+  assert.equal(directionVote([]), null);
 });
 
-test("chance of rain from the combined windows", () => {
-  const combined = combineForecasts(fakeTable());
-  assert.equal(chanceOfRain(combined[0]), 0);
-  assert.ok(Math.abs(chanceOfRain(combined[2]) - 33.33) < 0.01);
-  assert.equal(chanceOfRain(combined[3]), 100);
+test("mean direction across north", () => {
+  assert.ok(Math.abs(meanDirection([350, 10])!) < 1e-6);
+  assert.ok(Math.abs(meanDirection([80, 100])! - 90) < 1e-6);
+  assert.equal(meanDirection([]), null);
+  assert.equal(meanDirection([90, 270]), null);
 });
 
 test("session window rows pick the window of the session", () => {
@@ -74,52 +75,152 @@ test("session message", () => {
   const saturday = utc(2026, 11, 14, 10);
   assert.equal(sessionMessage(FP1, thursday, rows), null);
   assert.equal(sessionMessage(FP1, saturday, rows), "This session is over.");
-  assert.equal(sessionMessage(FP1, thursday, []), "No forecast yet.");
+  assert.equal(
+    sessionMessage(FP1, thursday, []),
+    "No forecast reaches this session yet.",
+  );
   // A session that started earlier in the current window is not over yet.
   assert.equal(sessionMessage(FP1, utc(2026, 11, 13, 8, 30), rows), null);
 });
 
-test("provider rows for FP1", () => {
-  const rows = providerRows(sessionWindowRows(fakeTable(), FP1));
+test("source rows for FP1, one group per centre", () => {
+  const groups = sourceRows(sessionWindowRows(fakeTable(), FP1));
   assert.deepEqual(
-    rows.map((row) => row.provider),
-    ["openweathermap", "Open-Meteo", "MET Norway"],
+    groups.map((group) => [group.centre, group.rows.map((row) => row.label)]),
+    [
+      ["NOAA", ["NOAA GFS"]],
+      ["DWD", ["DWD ICON"]],
+      ["ECMWF", ["MET Norway"]],
+    ],
   );
-  // The 06:00 window: wind 5 m/s for every provider, which is 18 km/h, from 225° (SW).
+  const rows = groups.flatMap((group) => group.rows);
+  // The 06:00 window: wind 5 m/s for every source, from 225° (SW).
   assert.deepEqual(
-    rows.map((row) => row.windKmh),
-    [18, 18, 18],
+    rows.map((row) => row.windSpeed),
+    [5, 5, 5],
   );
   assert.deepEqual(
     rows.map((row) => row.windFrom),
     ["SW", "SW", "SW"],
   );
+  // The service is named where its name says more than the source's.
+  assert.deepEqual(
+    rows.map((row) => row.via),
+    ["Open-Meteo", "Open-Meteo", null],
+  );
 });
 
-test("provider rows with a missing direction", () => {
-  const [row] = providerRows([
-    {
-      source: "met-norway",
-      time: 0,
-      temperature: 10,
-      rain: null,
-      windSpeed: 2,
-      windDeg: null,
-    },
+test("source rows keep the sources of one centre together", () => {
+  const row = (source: string) => ({
+    source,
+    time: 0,
+    temperature: 10,
+    rain: null,
+    windSpeed: 2,
+    windDeg: null,
+  });
+  const groups = sourceRows([
+    row("ecmwf-ifs"),
+    row("dwd-icon"),
+    row("ecmwf-aifs"),
   ]);
-  assert.equal(row.windFrom, "Unknown");
-  assert.equal(row.rain, null);
+  assert.deepEqual(
+    groups.map((group) => [
+      group.centre,
+      group.rows.map((item) => item.source),
+    ]),
+    [
+      ["ECMWF", ["ecmwf-ifs", "ecmwf-aifs"]],
+      ["DWD", ["dwd-icon"]],
+    ],
+  );
+  assert.equal(groups[0].rows[0].windFrom, null);
+  assert.equal(groups[0].rows[0].rain, null);
 });
 
-test("interval text", () => {
+test("range text: a range from three centres, both values with two", () => {
   const [first] = combineForecasts(fakeTable());
-  assert.equal(intervalText(first.temperature, "°C"), "95%: 7.9 to 10.8 °C");
-});
-
-test("interval text with one provider", () => {
+  assert.equal(
+    rangeText(first.temperature, "°C", metric.temperatureNumber),
+    "80% range: 9.0 to 9.8 °C",
+  );
+  const [two] = combineForecasts(fakeTable().slice(0, 16));
+  assert.equal(
+    rangeText(two.temperature, "°C", metric.temperatureNumber),
+    "9.0 and 10.0 °C",
+  );
   const [one] = combineForecasts(fakeTable().slice(0, 1));
   assert.equal(
-    intervalText(one.temperature, "°C"),
-    "One provider only: no interval",
+    rangeText(one.temperature, "°C", metric.temperatureNumber),
+    "One source",
   );
+  assert.equal(
+    rangeText(one.rain, "mm", (value) => value.toFixed(1)),
+    "One source",
+  );
+});
+
+test("range text in the chosen units", () => {
+  const imperial = unitFormat({ temperature: "f", wind: "mph" });
+  const [first] = combineForecasts(fakeTable());
+  // 9 to 9.8 °C is 48.2 to 49.6 °F.
+  assert.equal(
+    rangeText(first.temperature, "°F", imperial.temperatureNumber),
+    "80% range: 48.2 to 49.6 °F",
+  );
+  // 3.2 to 4 m/s is 7 to 9 mph.
+  assert.equal(
+    rangeText(first.wind, "mph", imperial.windNumber),
+    "80% range: 7 to 9 mph",
+  );
+});
+
+test("rain text counts the centres that expect rain", () => {
+  const combined = combineForecasts(fakeTable());
+  assert.equal(rainText(combined[0]), "0 of 3 expect ≥ 0.5 mm");
+  assert.equal(rainText(combined[3]), "1 of 3 expect ≥ 0.5 mm");
+  assert.equal(rainText(combined[4]), "3 of 3 expect ≥ 0.5 mm");
+  const none = combineWindow(0, [
+    {
+      source: "smhi",
+      time: 0,
+      temperature: 3,
+      windSpeed: null,
+      windDeg: null,
+      rain: null,
+    },
+  ]);
+  assert.equal(rainText(none), "No value");
+});
+
+test("sources text", () => {
+  const [first] = combineForecasts(fakeTable());
+  assert.equal(sourcesText(first), "3 sources");
+  const row = (source: string) => ({
+    source,
+    time: 0,
+    temperature: 1,
+    windSpeed: null,
+    windDeg: null,
+    rain: null,
+  });
+  assert.equal(
+    sourcesText(combineWindow(0, [row("ecmwf-ifs"), row("ecmwf-aifs")])),
+    "2 sources from 1 centre",
+  );
+  assert.equal(
+    sourcesText(
+      combineWindow(0, [row("ecmwf-ifs"), row("ecmwf-aifs"), row("ukmo")]),
+    ),
+    "3 sources from 2 centres",
+  );
+  assert.equal(sourcesText(combineWindow(0, [row("ukmo")])), "1 source");
+});
+
+test("axis ticks are round, even and hold both ends", () => {
+  assert.deepEqual(niceTicks(3.2, 9.7), [2, 4, 6, 8, 10]);
+  assert.deepEqual(niceTicks(0, 1, 3), [0, 0.5, 1]);
+  assert.deepEqual(niceTicks(0, 11.6, 3), [0, 5, 10, 15]);
+  assert.deepEqual(niceTicks(-3.5, 4), [-4, -2, 0, 2, 4]);
+  assert.deepEqual(niceTicks(5, 5), [5]);
 });
