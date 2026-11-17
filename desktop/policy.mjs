@@ -1,16 +1,10 @@
 const externalHosts = new Set([
   "open-meteo.com",
-  "api.open-meteo.com",
-  "ensemble-api.open-meteo.com",
+  "www.met.no",
   "api.met.no",
-  "api.rainviewer.com",
   "www.rainviewer.com",
   "www.openstreetmap.org",
-  "www.ecmwf.int",
-  "www.dwd.de",
-  "www.noaa.gov",
-  "meteofrance.com",
-  "api.ipma.pt",
+  "www.esri.com",
 ]);
 
 export function externalLink(value) {

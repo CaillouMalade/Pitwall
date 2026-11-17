@@ -7,6 +7,8 @@ export default defineConfig({
   plugins: [react()],
   resolve: { alias: { "@": fileURLToPath(new URL("./src", import.meta.url)) } },
   build: {
+    // The bundled observation log is one lazily loaded chunk of about 110 kB gzipped.
+    chunkSizeWarningLimit: 700,
     outDir: "../dist",
     emptyOutDir: true,
     rolldownOptions: {

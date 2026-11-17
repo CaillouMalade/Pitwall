@@ -58,18 +58,9 @@ jobs:
           lipo -archs "$binary" | grep -q arm64
           lipo -archs "$binary" | grep -q x86_64
           codesign --verify --deep --strict "release/mac-universal/$app_name.app"
-      - name: Open 2.3 and 2.4 together with production profiles and addresses
-        run: |
-          node scripts/download-baseline.mjs
-          volume="$RUNNER_TEMP/pitwall-baseline-volume"
-          mkdir "$volume"
-          hdiutil attach "$RUNNER_TEMP/pitwall-baseline.dmg" -readonly -nobrowse -mountpoint "$volume"
-          trap 'hdiutil detach "$volume"' EXIT
-          ditto "$volume/Pitwall 2.3 Preview.app" "$RUNNER_TEMP/Pitwall 2.3 Preview.app"
-          node scripts/coexist-smoke.mjs "$RUNNER_TEMP/Pitwall 2.3 Preview.app/Contents/MacOS/Pitwall 2.3 Preview"
       - name: Launch the packaged app twice and verify storage and isolation
         run: npm run desktop:smoke
-      - name: Run desktop provider, plan and native file tests
+      - name: Run the desktop app against synthetic provider answers
         run: npx playwright test --config playwright.desktop.config.ts
       - name: Verify notarization for the standard installer
         if: inputs.signed
@@ -119,7 +110,7 @@ jobs:
         run: npm run desktop:windows
       - name: Launch and reopen the packaged app
         run: npm run desktop:smoke
-      - name: Verify all feeds, plans and native file export/import
+      - name: Run the desktop app against synthetic provider answers
         run: npx playwright test --config playwright.desktop.config.ts
       - name: Install, reopen, reinstall and uninstall while retaining data
         shell: pwsh

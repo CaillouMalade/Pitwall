@@ -58,7 +58,7 @@ async function createWindow() {
     height: 1000,
     minWidth: 800,
     minHeight: 600,
-    backgroundColor: "#f5f6f3",
+    backgroundColor: "#f7f7f5",
     show: false,
     autoHideMenuBar: process.platform !== "darwin",
     webPreferences: {
@@ -100,7 +100,7 @@ async function createWindow() {
           title: "Pitwall needs to reopen",
           message: "The weather window stopped responding.",
           detail:
-            "Your saved plans are still on this computer. Quit and reopen Pitwall.",
+            "Your saved tracks are still on this computer. Quit and reopen Pitwall.",
           buttons: ["Quit Pitwall"],
         })
         .then(() => app.quit());
@@ -131,12 +131,21 @@ async function start() {
   );
   session.defaultSession.setPermissionCheckHandler(() => false);
   session.defaultSession.on("will-download", (event, item) => {
-    if (!server || !isAppDownload(item.getURL(), server.origin)) {
+    if (!server || !isAppDownload(item.getURL(), server.origin))
       event.preventDefault();
-      return;
-    }
-    item.setSaveDialogOptions({ title: "Save Pitwall export" });
   });
+  // MET Norway asks every client to identify itself. Browsers cannot set this
+  // header, so the desktop app adds it for MET requests only.
+  session.defaultSession.webRequest.onBeforeSendHeaders(
+    { urls: ["https://api.met.no/*"] },
+    (details, callback) =>
+      callback({
+        requestHeaders: {
+          ...details.requestHeaders,
+          "User-Agent": `Pitwall/${app.getVersion()} github.com/Arthur-Brht/pitwall`,
+        },
+      }),
+  );
   if (testing && process.env.PITWALL_SMOKE_OUTPUT)
     session.defaultSession.webRequest.onBeforeRequest((details, callback) =>
       callback({ cancel: !details.url.startsWith("http://localhost:") }),
