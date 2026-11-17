@@ -3,7 +3,7 @@ description: Report a reproducible Pitwall problem.
 body:
   - type: markdown
     attributes:
-      value: Do not attach credentials, session backups or private coordinates. Forecast disagreement by itself is not a software bug.
+      value: Do not attach credentials or private coordinates. Forecast disagreement by itself is not a software bug.
   - type: textarea
     id: behaviour
     attributes:
@@ -25,5 +25,5 @@ body:
   - type: textarea
     id: evidence
     attributes:
-      label: Circuit, UTC valid time, source status and screenshots
+      label: Track, session or UTC time, provider warnings and screenshots
       description: Include only information you are comfortable making public.

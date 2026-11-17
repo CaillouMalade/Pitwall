@@ -1,13 +1,13 @@
-﻿# Security
+# Security
 
-The current 1.x release is maintained. Use a recent release and the locked dependencies from `npm ci`.
+The current 3.x preview is maintained. Use a recent release and the locked dependencies from `npm ci`.
 
-The desktop app bundles Electron with sandboxing, context isolation, no renderer Node integration, no general IPC bridge, denied permission requests and restricted HTTPS external links. Packaged runtime fuses disable Node execution/environment options, CLI inspection and loading code outside the verified ASAR archive. Imports/exports use native file dialogs. Its profile is separate from ordinary browsers. Mac previews are explicitly ad-hoc signed; only the credential-backed release workflow can claim Developer ID signing and Apple notarization. Windows previews are unsigned and can be blocked by Windows security policies. No installer changes those policies. See [Mac release verification](docs/MAC_APP.md) and [Windows release verification](docs/WINDOWS_APP.md).
+The desktop app bundles Electron with sandboxing, context isolation, no renderer Node integration, no IPC bridge, denied permission requests and an allowlist for external HTTPS links. Packaged runtime fuses disable Node execution/environment options, CLI inspection and loading code outside the verified ASAR archive. Its profile is separate from ordinary browsers. Mac previews are ad-hoc signed and not notarized unless built by the credential-backed release workflow; Windows previews are unsigned and can be blocked by Windows security policies.
 
-Pitwall serves built files on loopback only. It has no account system, remote write API or backend secrets. The production server rejects foreign hostnames, blocks framing and restricts scripts and provider connections with a content security policy. The optional worker caches the local interface, not cross-origin weather or map tiles.
+Pitwall serves built files on loopback only. It has no account system, backend or API keys. The local server rejects foreign hostnames, blocks framing and restricts scripts, images and connections to the weather and map services with a content security policy. Error messages shown in the app are fixed text and never include request URLs.
 
-Never put credentials in browser code or `VITE_` variables. Do not share device backups or history exports without reviewing their locations and session details. Provider responses and imported files are untrusted data.
+Never put credentials in browser code or `VITE_` variables. Provider responses are untrusted data and are validated before use.
 
-For a non-sensitive bug, open a GitHub issue with reproduction steps and versions. For a vulnerability involving private data or an exploit, do not post the details publicly: use GitHub's private vulnerability reporting if the Security tab offers it. Otherwise open a minimal issue requesting a private reporting channel, with no exploit, credential or personal data attached.
+For a non-sensitive bug, open a GitHub issue with reproduction steps and versions. For a vulnerability, do not post the details publicly: use GitHub's private vulnerability reporting if the Security tab offers it. Otherwise open a minimal issue requesting a private channel, with no exploit or personal data attached.
 
-CI runs a redacted Gitleaks scan of reachable history, dependency auditing and read-only build/browser checks. Scanner success does not prove the absence of every vulnerability. GitHub Actions dependencies are pinned to commit hashes.
+CI runs a redacted Gitleaks scan of reachable history, dependency auditing and read-only build/browser checks. GitHub Actions dependencies are pinned to commit hashes.
