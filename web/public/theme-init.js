@@ -6,14 +6,11 @@
   } catch (error) {
     // Appearance still follows the system when storage is blocked.
   }
-  var theme =
-    saved === "light" || saved === "dark"
-      ? saved
-      : matchMedia("(prefers-color-scheme: light)").matches
-        ? "light"
-        : "dark";
-  document.documentElement.dataset.theme = theme;
+  var dark =
+    saved === "dark" ||
+    (saved !== "light" && matchMedia("(prefers-color-scheme: dark)").matches);
+  document.documentElement.dataset.theme = dark ? "dark" : "light";
   document
     .querySelector('meta[name="theme-color"]')
-    .setAttribute("content", theme === "light" ? "#f6f6f3" : "#0f1113");
+    .setAttribute("content", dark ? "#111111" : "#f7f7f5");
 })();
