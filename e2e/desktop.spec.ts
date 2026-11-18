@@ -58,10 +58,12 @@ test("the desktop app loads forecasts, sessions and history", async ({
     ]),
   );
   await openPage(page, "Session dashboard");
-  await expect(page.getByText("9 of 9 agree")).toBeVisible();
+  await expect(page.getByText("9 of 9 agree").first()).toBeVisible();
   await selectTrack(page, "Monza");
   await openPage(page, "History");
-  await expect(page.getByRole("region", { name: "Summary" })).toBeVisible();
+  await expect(
+    page.getByRole("region", { name: "Year by year" }),
+  ).toBeVisible();
   await page.getByRole("button", { name: "About" }).click();
   await expect(
     page.getByRole("dialog", { name: "About Pitwall" }).getByText(/^Version /),

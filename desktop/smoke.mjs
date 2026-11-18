@@ -14,7 +14,7 @@ export async function packagedSmoke(window, origin) {
     };
     const pages = ['Weekend overview', 'Session dashboard', 'History', 'Track comparison'];
     const rendered = () => pages.every(label =>
-      [...document.querySelectorAll('nav[aria-label="Pages"] button')].some(button => button.textContent === label));
+      [...document.querySelectorAll('nav[aria-label="Pages"] button')].some(button => button.textContent.trim() === label));
     await waitFor(rendered);
     const reopen = ${JSON.stringify(process.env.PITWALL_SMOKE_REOPEN === "1")};
     const previous = localStorage.getItem('pitwall-desktop-smoke');
@@ -41,8 +41,15 @@ export async function packagedSmoke(window, origin) {
     const warned = await waitFor(() =>
       ['Skipped Open-Meteo', 'Skipped MET Norway'].every(text => document.body.innerText.includes(text)));
     // Red Bull Ring, the first track, has too little in the bundled log; Monza has days of it.
+    // The track list is folded away until it is asked for.
+    if (!document.querySelector('ul[aria-label="Tracks"] button'))
+      document.querySelector('button[aria-controls="track-list"]').click();
+    await waitFor(() => document.querySelector('ul[aria-label="Tracks"] button'));
     [...document.querySelectorAll('ul[aria-label="Tracks"] button')].find(item => item.textContent.startsWith('Monza')).click();
-    [...document.querySelectorAll('nav[aria-label="Pages"] button')].find(item => item.textContent === 'History').click();
+    [...document.querySelectorAll('nav[aria-label="Pages"] button')].find(item => item.textContent.trim() === 'History').click();
+    // Recent days fall back on the bundled log when the archive cannot be reached.
+    await waitFor(() => [...document.querySelectorAll('[role="radio"]')].some(item => item.textContent.trim() === 'Recent'));
+    [...document.querySelectorAll('[role="radio"]')].find(item => item.textContent.trim() === 'Recent').click();
     const history = await waitFor(() => document.body.innerText.includes('Showing the log that comes with Pitwall'));
     return {
       title: document.title,

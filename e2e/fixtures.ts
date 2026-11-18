@@ -14,7 +14,7 @@ const hours = (count = HOURS) =>
 
 // One invented forecast per source, written out below in each service's own
 // format. A wet spell on the first afternoon of the weekend (18 November,
-// 12:00 to 18:00 UTC) with a different amount per source, so they disagree.
+// 12:00 to 18:00 UTC, which is 13:00 to 19:00 at the European tracks) with a different amount per source, so they disagree.
 const WET_FROM = Date.UTC(2026, 10, 18, 12);
 const WET_TO = Date.UTC(2026, 10, 18, 18);
 
@@ -48,7 +48,7 @@ const SOURCES: Record<string, Invented> = {
   jma_seamless: { temperature: -0.8, wind: -0.9, direction: -8, rain: 0 },
   cma_grapes_global: { temperature: 1.2, wind: 0.4, direction: 5, rain: 0.6 },
   "met-norway": { temperature: -0.6, wind: 0.6, direction: 7, rain: 0.4 },
-  "bright-sky": { temperature: -0.3, wind: -0.1, direction: 3, rain: 0.3 },
+  "bright-sky": { temperature: -0.3, wind: -0.1, direction: 3, rain: 0.5 },
   dmi: { temperature: 0.4, wind: 0.3, direction: -4, rain: 0 },
   geosphere: { temperature: -1, wind: -0.4, direction: 9, rain: 1 },
   nws: { temperature: 0.5, wind: 0.2, direction: -2, rain: 0.6 },
@@ -101,6 +101,29 @@ function openMeteoAnswer(url: URL) {
     );
   }
   return { hourly };
+}
+
+/**
+ * The rain map: 49 places in 15-minute steps. A band of rain moves from west
+ * to east, so the frames differ and the middle (the track) gets wet for a while.
+ */
+function rainGridAnswer(url: URL) {
+  const first = Date.parse(url.searchParams.get("start_minutely_15") + "Z");
+  const last = Date.parse(url.searchParams.get("end_minutely_15") + "Z");
+  const places = (url.searchParams.get("latitude") ?? "").split(",").length;
+  const steps = Math.round((last - first) / (15 * 60_000)) + 1;
+  const times = Array.from(
+    { length: steps },
+    (_, i) => first + i * 15 * 60_000,
+  );
+  return Array.from({ length: places }, (_, place) => ({
+    minutely_15: {
+      time: times.map((time) => iso(time).slice(0, 16)),
+      precipitation: times.map((_, step) =>
+        Math.abs((place % 7) - (step % 9)) <= 1 ? 0.3 : 0,
+      ),
+    },
+  }));
 }
 
 function metNorwayAnswer() {
@@ -218,8 +241,32 @@ function nwsGridAnswer() {
   };
 }
 
+/** Hourly history: a degree warmer each hour of the day, rain from 12:00 to 14:00 UTC. */
+function archiveHoursAnswer(url: URL) {
+  const first = Date.parse(url.searchParams.get("start_date") + "T00:00:00Z");
+  const last = Date.parse(url.searchParams.get("end_date") + "T00:00:00Z");
+  const times = Array.from(
+    { length: Math.round((last - first) / HOUR) + 24 },
+    (_, i) => first + i * HOUR,
+  );
+  const hour = (time: number) => new Date(time).getUTCHours();
+  return {
+    hourly: {
+      time: times.map((time) => iso(time).slice(0, 16)),
+      temperature_2m: times.map((time) => 5 + hour(time) / 2),
+      precipitation: times.map((time) =>
+        hour(time) >= 13 && hour(time) <= 14 ? 1.5 : 0,
+      ),
+      wind_speed_10m: times.map((time) => 3 + (hour(time) % 6)),
+      wind_direction_10m: times.map(() => 240),
+      wind_gusts_10m: times.map((time) => 7 + (hour(time) % 6)),
+    },
+  };
+}
+
 /** Daily history that differs by latitude, so tracks rank in a known order. */
 function archiveAnswer(url: URL) {
+  if (url.searchParams.has("hourly")) return archiveHoursAnswer(url);
   const latitude = Number(url.searchParams.get("latitude"));
   const first = Date.parse(url.searchParams.get("start_date") + "T00:00:00Z");
   const last = Date.parse(url.searchParams.get("end_date") + "T00:00:00Z");
@@ -245,6 +292,8 @@ function archiveAnswer(url: URL) {
         i % 5 === 0 ? Number((latitude / 5).toFixed(1)) : 0,
       ),
       wind_speed_10m_max: days.map((_, i) => 4 + (i % 6)),
+      wind_gusts_10m_max: days.map((_, i) => 9 + (i % 6)),
+      wind_direction_10m_dominant: days.map(() => 240),
     },
   };
 }
@@ -257,6 +306,23 @@ const RADAR = {
       path: `/v2/radar/${i}`,
     })),
   },
+};
+
+/** The racetrack lines OpenStreetMap has near a track the user added. */
+const OUTLINE = {
+  elements: [
+    {
+      type: "way",
+      tags: { highway: "raceway" },
+      geometry: [
+        { lat: 27.45, lon: -81.352 },
+        { lat: 27.458, lon: -81.352 },
+        { lat: 27.458, lon: -81.344 },
+        { lat: 27.45, lon: -81.344 },
+        { lat: 27.45, lon: -81.352 },
+      ],
+    },
+  ],
 };
 
 // A 1×1 transparent PNG for every map tile.
@@ -277,7 +343,18 @@ export interface Services {
 function answer(url: URL): unknown | null {
   switch (url.hostname) {
     case "api.open-meteo.com":
+      if (url.searchParams.has("minutely_15")) return rainGridAnswer(url);
+      // The time zone of a track the user added.
+      if (url.searchParams.get("timezone") === "auto")
+        return {
+          timezone:
+            Number(url.searchParams.get("longitude")) < -30
+              ? "America/New_York"
+              : "Europe/Paris",
+        };
       return openMeteoAnswer(url);
+    case "overpass-api.de":
+      return OUTLINE;
     case "archive-api.open-meteo.com":
       return archiveAnswer(url);
     case "api.met.no":
@@ -358,12 +435,12 @@ export const test = base.extend<{
 /** Pick a track with whichever control the layout shows. */
 export async function selectTrack(page: Page, name: string) {
   const select = page.getByRole("combobox", { name: "Track", exact: true });
-  if (await select.isVisible()) await select.selectOption({ label: name });
-  else
-    await page
-      .getByRole("list", { name: "Tracks" })
-      .getByRole("button", { name })
-      .click();
+  if (await select.isVisible()) return select.selectOption({ label: name });
+  // The list is folded away until it is asked for.
+  const list = page.getByRole("list", { name: "Tracks" });
+  if (!(await list.isVisible()))
+    await page.getByRole("button", { name: "Choose another track" }).click();
+  await list.getByRole("button", { name }).click();
 }
 
 export async function openPage(page: Page, name: string) {

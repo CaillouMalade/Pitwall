@@ -7,7 +7,8 @@ export default defineConfig({
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,
   workers: process.env.CI ? 2 : undefined,
-  timeout: 30000,
+  // The longest tests walk through a dozen steps; WebKit needs more than 30 s for them.
+  timeout: 60000,
   expect: { timeout: 10000 },
   reporter: process.env.CI
     ? [["list"], ["html", { open: "never" }]]
@@ -22,7 +23,13 @@ export default defineConfig({
   projects: [
     { name: "chromium", use: { ...devices["Desktop Chrome"] } },
     { name: "firefox", use: { ...devices["Desktop Firefox"] } },
-    { name: "webkit", use: { ...devices["Desktop Safari"] } },
+    {
+      name: "webkit",
+      // Playwright's WebKit on Windows draws without a graphics card. With the
+      // app's animations running it is too slow for the longest tests, so it is
+      // tested with "reduce motion" on, which the app honours by stopping them.
+      use: { ...devices["Desktop Safari"], reducedMotion: "reduce" },
+    },
     { name: "mobile", use: { ...devices["Pixel 7"] } },
   ],
   // Separate port and fresh browser contexts protect the real localhost:4173 data.
