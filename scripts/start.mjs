@@ -18,8 +18,8 @@ const types = {
   ".txt": "text/plain; charset=utf-8",
 };
 
-// The only outside addresses the app may reach: the forecast, archive and radar
-// services, and the map tiles. Everything else is refused by the browser.
+// The only outside addresses the app may reach: the forecast, archive, radar and
+// track-outline services, and the map tiles. Everything else is refused by the browser.
 const forecastServices = [
   "https://api.open-meteo.com",
   "https://archive-api.open-meteo.com",
@@ -31,6 +31,7 @@ const forecastServices = [
   "https://opendataapi.dmi.dk",
   "https://dataset.api.hub.geosphere.at",
   "https://api.rainviewer.com",
+  "https://overpass-api.de",
 ];
 const mapTiles = [
   "https://tile.openstreetmap.org",
