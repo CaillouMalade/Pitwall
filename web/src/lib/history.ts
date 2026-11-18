@@ -105,6 +105,21 @@ export interface DailyWeather {
   temperatureRange: number | null;
   /** The day's strongest wind in m/s; the bundled observations have none. */
   windMax: number | null;
+  /** The day's strongest gust in m/s. */
+  gustMax: number | null;
+  /** The direction the wind mostly came from, in degrees. */
+  windFrom: number | null;
+}
+
+/** One hour of past weather, named by its start. Units: °C, mm, m/s, degrees. */
+export interface HourlyWeather {
+  time: number;
+  temperature: number | null;
+  /** The rain that fell in the hour. */
+  rain: number | null;
+  windSpeed: number | null;
+  windDeg: number | null;
+  gust: number | null;
 }
 
 const mean = (values: number[]) =>
@@ -144,6 +159,8 @@ export function observedDays(
         rain,
         temperatureRange: min === null || max === null ? null : max - min,
         windMax: null,
+        gustMax: null,
+        windFrom: null,
       };
     });
 }
@@ -222,4 +239,96 @@ export function onDays(
 ): DailyWeather[] {
   const wanted = new Set(days);
   return history.days.filter((day) => wanted.has(day.day));
+}
+
+/** What the same dates looked like over many years. */
+export interface Climate {
+  /** How many days went into it, and over how many years. */
+  days: number;
+  years: number;
+  /** Share of the days with at least RAIN_DAY_MM, from 0 to 1. */
+  rainShare: number | null;
+  /** Share of the years with at least one such day in the dates. */
+  wetYearShare: number | null;
+  /** The middle 80% of the daily highs and lows: [10th, median, 90th]. */
+  high: [number, number, number] | null;
+  low: [number, number, number] | null;
+  /** The same for each day's strongest wind, in m/s. */
+  wind: [number, number, number] | null;
+  /** The wettest day, in mm, and when it was. */
+  wettest: { day: string; rain: number } | null;
+}
+
+function spread(values: number[]): [number, number, number] | null {
+  if (values.length === 0) return null;
+  const sorted = [...values].sort((a, b) => a - b);
+  const at = (fraction: number) => {
+    const position = (sorted.length - 1) * fraction;
+    const below = Math.floor(position);
+    const above = Math.ceil(position);
+    return sorted[below] + (sorted[above] - sorted[below]) * (position - below);
+  };
+  return [at(0.1), at(0.5), at(0.9)];
+}
+
+/** Summarise the same dates over several years. */
+export function climate(
+  years: readonly { year: number; days: readonly DailyWeather[] }[],
+): Climate {
+  const days = years.flatMap((year) => year.days);
+  const rains = days.filter((day) => day.rain !== null);
+  const withRain = years.filter((year) =>
+    year.days.some((day) => day.rain !== null),
+  );
+  let wettest: Climate["wettest"] = null;
+  for (const day of rains)
+    if (wettest === null || day.rain! > wettest.rain)
+      wettest = { day: day.day, rain: day.rain! };
+  return {
+    days: days.length,
+    years: years.length,
+    rainShare: rains.length
+      ? rains.filter((day) => day.rain! >= RAIN_DAY_MM).length / rains.length
+      : null,
+    wetYearShare: withRain.length
+      ? withRain.filter((year) =>
+          year.days.some((day) => (day.rain ?? 0) >= RAIN_DAY_MM),
+        ).length / withRain.length
+      : null,
+    high: spread(numbers(days.map((day) => day.temperatureMax))),
+    low: spread(numbers(days.map((day) => day.temperatureMin))),
+    wind: spread(numbers(days.map((day) => day.windMax))),
+    wettest,
+  };
+}
+
+/** Hours as days on a zone's calendar, for a chart of a long range. */
+export function hoursToDays(
+  hours: readonly HourlyWeather[],
+  dayOf: (time: number) => string,
+): DailyWeather[] {
+  const byDay = new Map<string, HourlyWeather[]>();
+  for (const hour of hours) {
+    const day = dayOf(hour.time);
+    byDay.set(day, [...(byDay.get(day) ?? []), hour]);
+  }
+  return [...byDay.entries()].map(([day, rows]) => {
+    const temperatures = numbers(rows.map((row) => row.temperature));
+    const rains = numbers(rows.map((row) => row.rain));
+    const winds = numbers(rows.map((row) => row.windSpeed));
+    const gusts = numbers(rows.map((row) => row.gust));
+    const min = temperatures.length ? Math.min(...temperatures) : null;
+    const max = temperatures.length ? Math.max(...temperatures) : null;
+    return {
+      day,
+      temperatureMin: min,
+      temperatureMax: max,
+      temperatureMean: mean(temperatures),
+      rain: rains.length ? rains.reduce((sum, rain) => sum + rain, 0) : null,
+      temperatureRange: min === null || max === null ? null : max - min,
+      windMax: winds.length ? Math.max(...winds) : null,
+      gustMax: gusts.length ? Math.max(...gusts) : null,
+      windFrom: null,
+    };
+  });
 }

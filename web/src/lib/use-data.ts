@@ -5,11 +5,17 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { fetchAllForecasts, type ForecastResult } from "./fetching.ts";
-import { fetchHistory } from "./history-source.ts";
+import {
+  fetchHistory,
+  fetchHours,
+  fetchSameDates,
+  type YearDays,
+} from "./history-source.ts";
 import {
   MIN_DAYS,
   observedDays,
   parseObservations,
+  type HourlyWeather,
   type Observation,
   type TrackHistory,
 } from "./history.ts";
@@ -21,9 +27,11 @@ import {
 } from "./providers/index.ts";
 import { useSettings } from "./settings.tsx";
 import type { ProviderId } from "./sources.ts";
-import { loadSnapshot, saveSnapshot } from "./storage.ts";
+import { fetchRainGrid } from "./rain-map.ts";
+import { keep, loadKept, loadSnapshot, saveSnapshot } from "./storage.ts";
 import type { ForecastPoint, RadarFrame, Track } from "./types.ts";
 import { keepForecastRange } from "./windows.ts";
+import { trackZone } from "./zone.ts";
 
 const MINUTE = 60_000;
 export const FORECAST_TTL = 10 * MINUTE;
@@ -31,6 +39,8 @@ const FAILED_TTL = MINUTE;
 const HISTORY_TTL = 6 * 60 * MINUTE;
 /** A history that fell back to the bundled log is tried again soon. */
 const FALLBACK_TTL = 2 * MINUTE;
+const RAIN_GRID_TTL = 30 * MINUTE;
+const SAME_DATES_KEY = "pitwall-same-dates";
 
 interface Cached<T> {
   at: number;
@@ -272,6 +282,86 @@ export function useRadar(): Loadable<RadarFrame[]> {
   return data;
 }
 
+// Anything else that is fetched: one loader, kept by key for a while.
+
+const kept = new Map<string, Cached<unknown>>();
+
+/** Load once per key and keep the answer for `ttl`; a failure is not kept. */
+export function loadKeyed<T>(
+  key: string,
+  ttl: number,
+  load: () => Promise<T>,
+): Promise<T> {
+  const existing = kept.get(key) as Cached<T> | undefined;
+  if (fresh(existing)) return existing.value;
+  const entry: Cached<T> = { at: Date.now(), ttl, value: load() };
+  kept.set(key, entry as Cached<unknown>);
+  entry.value.catch(() => {
+    if (kept.get(key) === entry) kept.delete(key);
+  });
+  return entry.value;
+}
+
+/** The state of one keyed load; with a null key nothing is loaded. */
+export function useKeyed<T>(
+  key: string | null,
+  ttl: number,
+  load: () => Promise<T>,
+): Loadable<T> & { retry: () => void } {
+  const online = useOnline();
+  const [version, setVersion] = useState(0);
+  const [result, setResult] = useState<{
+    key: string;
+    data: Loadable<T>;
+  } | null>(null);
+  const loader = useRef(load);
+  loader.current = load;
+
+  useEffect(() => {
+    if (key === null) return;
+    let active = true;
+    loadKeyed(key, ttl, () => loader.current()).then(
+      (value) => active && setResult({ key, data: { state: "ready", value } }),
+      (error) =>
+        active &&
+        setResult({
+          key,
+          data: { state: "failed", message: userMessage(error) },
+        }),
+    );
+    return () => {
+      active = false;
+    };
+  }, [key, ttl, version, online]);
+
+  const retry = useCallback(() => {
+    if (key !== null) kept.delete(key);
+    setResult(null);
+    setVersion((value) => value + 1);
+  }, [key]);
+
+  const data: Loadable<T> =
+    key !== null && result && result.key === key
+      ? result.data
+      : { state: "loading" };
+  return { ...data, retry };
+}
+
+// The forecast rain map of a session
+
+export function useRainGrid(
+  track: Track,
+  start: number,
+  end: number,
+  enabled: boolean,
+) {
+  return useKeyed(
+    enabled ? `rain-grid|${placeKey(track)}|${start}|${end}` : null,
+    RAIN_GRID_TTL,
+    () => fetchRainGrid(track, start, end),
+  );
+}
+
 // History
 
 let observations: Promise<Observation[]> | null = null;
@@ -287,8 +377,6 @@ function loadObservations(): Promise<Observation[]> {
   return observations;
 }
 
-const historyCache = new Map<string, Cached<TrackHistory>>();
-
 async function fetchTrackHistory(
   track: Track,
   days: number,
@@ -297,7 +385,13 @@ async function fetchTrackHistory(
     return {
       trackId: track.id,
       origin: "archive",
-      days: await fetchHistory(track, days),
+      days: await fetchHistory(
+        track,
+        days,
+        Date.now(),
+        undefined,
+        trackZone(track),
+      ),
     };
   } catch (error) {
     // The archive cannot be reached: fall back on the bundled log, when the
@@ -310,45 +404,43 @@ async function fetchTrackHistory(
   }
 }
 
+const historyKey = (track: Track) =>
+  `${track.id}|${placeKey(track)}|${trackZone(track)}`;
+
 export function loadHistory(track: Track, days: number): Promise<TrackHistory> {
-  const key = `${track.id}|${placeKey(track)}|${days}`;
-  if (!fresh(historyCache.get(key))) {
-    const entry: Cached<TrackHistory> = {
-      at: Date.now(),
-      ttl: HISTORY_TTL,
-      value: fetchTrackHistory(track, days),
-    };
-    historyCache.set(key, entry);
-    entry.value.then(
-      (history) => {
-        if (history.origin === "bundled") entry.ttl = FALLBACK_TTL;
-      },
-      () => {
-        if (historyCache.get(key) === entry) historyCache.delete(key);
-      },
-    );
-  }
-  return historyCache.get(key)!.value;
+  const key = `history|${historyKey(track)}|${days}`;
+  const value = loadKeyed(key, HISTORY_TTL, () =>
+    fetchTrackHistory(track, days),
+  );
+  value.then(
+    (history) => {
+      // A history that fell back to the bundled log is tried again soon.
+      const entry = kept.get(key);
+      if (history.origin === "bundled" && entry) entry.ttl = FALLBACK_TTL;
+    },
+    () => undefined,
+  );
+  return value;
 }
 
-/** The history of each given track, by track id. */
-export function useHistories(
+/** One load per track, by track id. */
+function useEach<T>(
   tracks: readonly Track[],
-  days: number,
-): Record<string, Loadable<TrackHistory>> {
+  suffix: string,
+  load: (track: Track) => Promise<T>,
+): Record<string, Loadable<T>> {
   const online = useOnline();
-  const key = tracks
-    .map((track) => `${track.id}|${placeKey(track)}`)
-    .concat(String(days))
-    .join(";");
+  const key = tracks.map(historyKey).concat(suffix).join(";");
   const [results, setResults] = useState<{
     key: string;
-    data: Record<string, Loadable<TrackHistory>>;
+    data: Record<string, Loadable<T>>;
   }>({ key, data: {} });
+  const loader = useRef(load);
+  loader.current = load;
 
   useEffect(() => {
     let active = true;
-    const set = (id: string, data: Loadable<TrackHistory>) => {
+    const set = (id: string, data: Loadable<T>) => {
       if (!active) return;
       setResults((current) => ({
         key,
@@ -356,7 +448,7 @@ export function useHistories(
       }));
     };
     for (const track of tracks)
-      loadHistory(track, days).then(
+      loader.current(track).then(
         (value) => set(track.id, { state: "ready", value }),
         (error) =>
           set(track.id, { state: "failed", message: userMessage(error) }),
@@ -364,7 +456,7 @@ export function useHistories(
     return () => {
       active = false;
     };
-    // The tracks' ids and places, and the period, are the identity here.
+    // The tracks' ids, places and zones, and the suffix, are the identity here.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key, online]);
 
@@ -377,6 +469,88 @@ export function useHistories(
   );
 }
 
+/** The last `days` days of each given track, by track id. */
+export function useHistories(
+  tracks: readonly Track[],
+  days: number,
+): Record<string, Loadable<TrackHistory>> {
+  return useEach(tracks, `recent|${days}`, (track) => loadHistory(track, days));
+}
+
 export function useHistory(track: Track, days: number): Loadable<TrackHistory> {
   return useHistories([track], days)[track.id];
+}
+
+/** Every hour of a range of days at a track. Past days never change, so they are kept long. */
+export function loadHours(
+  track: Track,
+  start: string,
+  end: string,
+): Promise<HourlyWeather[]> {
+  return loadKeyed(
+    `hours|${historyKey(track)}|${start}|${end}`,
+    HISTORY_TTL,
+    () => fetchHours(track, start, end, trackZone(track)),
+  );
+}
+
+/** The hours of a range of days for each given track, by track id. */
+export function useHours(
+  tracks: readonly Track[],
+  start: string,
+  end: string,
+): Record<string, Loadable<HourlyWeather[]>> {
+  return useEach(tracks, `hours|${start}|${end}`, (track) =>
+    loadHours(track, start, end),
+  );
+}
+
+const isYears = (value: unknown): value is YearDays[] =>
+  Array.isArray(value) &&
+  value.every(
+    (item) =>
+      typeof (item as YearDays)?.year === "number" &&
+      Array.isArray((item as YearDays)?.days),
+  );
+
+/**
+ * The same dates in earlier years. Whole years that are over never change, so
+ * the answer is also kept on this device and shown again without a connection.
+ */
+export function loadSameDates(
+  track: Track,
+  monthDay: string,
+  length: number,
+  years: readonly number[],
+): Promise<YearDays[]> {
+  const name = `${placeKey(track)}|${trackZone(track)}|${monthDay}|${length}|${years[0]}-${years.at(-1)}`;
+  return loadKeyed(`same-dates|${name}`, HISTORY_TTL, async () => {
+    const saved = loadKept(SAME_DATES_KEY, isYears)[name];
+    if (saved && saved.length >= years.length - 1) return saved;
+    const found = await fetchSameDates(
+      track,
+      monthDay,
+      length,
+      years,
+      trackZone(track),
+    ).catch((error: unknown) => {
+      if (saved?.length) return saved;
+      throw error;
+    });
+    keep(SAME_DATES_KEY, name, found, isYears, 8);
+    return found;
+  });
+}
+
+export function useSameDates(
+  track: Track,
+  monthDay: string,
+  length: number,
+  years: readonly number[],
+) {
+  return useKeyed(
+    `same-dates-view|${placeKey(track)}|${trackZone(track)}|${monthDay}|${length}|${years[0]}-${years.at(-1)}`,
+    HISTORY_TTL,
+    () => loadSameDates(track, monthDay, length, years),
+  );
 }

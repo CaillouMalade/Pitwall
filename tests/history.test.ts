@@ -70,6 +70,8 @@ test("the archive is asked for the days before today, for any place", async () =
     rain: 12.4,
     temperatureRange: 8,
     windMax: 9,
+    gustMax: null,
+    windFrom: null,
   });
 });
 
@@ -125,6 +127,8 @@ const daily = (
   rain,
   temperatureRange: mean === null ? null : 8,
   windMax: wind,
+  gustMax: null,
+  windFrom: null,
 });
 
 test("a summary counts rain days from 1 mm", () => {
