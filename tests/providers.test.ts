@@ -65,16 +65,16 @@ async function noCoverage(run: Promise<unknown>) {
   );
 }
 
-// The windows
+// The hourly steps
 
-test("window start and rain sums", () => {
-  assert.equal(windowStart(utc(2026, 11, 15, 14, 20)), utc(2026, 11, 15, 12));
+test("hour start and rain sums", () => {
+  assert.equal(windowStart(utc(2026, 11, 15, 14, 20)), utc(2026, 11, 15, 14));
   close(sumRain([0.4, 0.4, 1.4]), 2.2);
   assert.equal(sumRain([0.4, null, 1.4]), null);
   assert.equal(sumRain([0.4, undefined, 1.4]), null);
 });
 
-test("hourly values become windows: values at the start, rain over 3 hours", () => {
+test("hourly values become points: values at the start, rain of that hour", () => {
   const start = utc(2026, 11, 16);
   const hour = 3_600_000;
   const instant = (temperature: number) => ({
@@ -88,22 +88,32 @@ test("hourly values become windows: values at the start, rain over 3 hours", () 
       [start, instant(5)],
       [start + hour, instant(6)],
       [start + 3 * hour, instant(8)],
+      // Not on a full hour: left out.
+      [start + 3.5 * hour, instant(9)],
     ]),
     new Map([
       [start, 0.5],
-      [start + hour, 0.25],
       [start + 2 * hour, 0.25],
-      [start + 3 * hour, 1],
     ]),
   );
   assert.deepEqual(points, [
-    { source: "test", time: start, ...instant(5), rain: 1 },
-    // Only one of the window's 3 hours has rain: the total is not known.
+    { source: "test", time: start, ...instant(5), rain: 0.5 },
+    // No rain value for this hour: it stays unknown, not 0.
+    { source: "test", time: start + hour, ...instant(6), rain: null },
+    // Rain only: the values at its start are missing.
+    {
+      source: "test",
+      time: start + 2 * hour,
+      temperature: null,
+      windSpeed: null,
+      windDeg: null,
+      rain: 0.25,
+    },
     { source: "test", time: start + 3 * hour, ...instant(8), rain: null },
   ]);
 });
 
-test("a window where the source says nothing is left out", () => {
+test("an hour where the source says nothing is left out", () => {
   const start = utc(2026, 11, 16);
   assert.deepEqual(
     hourlyToWindows(
@@ -119,29 +129,26 @@ test("a window where the source says nothing is left out", () => {
 
 const ONE_MODEL = [["icon_seamless", "dwd-icon"]] as const;
 
-test("Open-Meteo windows, units and rain", async () => {
+test("Open-Meteo hours, units and rain", async () => {
   const fetch = fakeFetch(json(fixture("open-meteo.json")));
   const points = await openMeteo(fetch, ONE_MODEL).forecast(MONZA, NOW);
-  // 18:00 is before the current window (21:00).
-  assert.deepEqual(times(points), [
-    utc(2026, 11, 15, 21),
-    utc(2026, 11, 16, 0),
-    utc(2026, 11, 16, 3),
-    utc(2026, 11, 16, 6),
-    utc(2026, 11, 16, 9),
-  ]);
+  // 21:00 is before the current hour (22:00); the answer ends at 09:00.
+  assert.equal(points.length, 12);
+  assert.equal(points[0].time, utc(2026, 11, 15, 22));
+  assert.equal(points.at(-1)!.time, utc(2026, 11, 16, 9));
   const [first] = points;
   assert.equal(first.source, "dwd-icon");
   assert.equal(first.temperature, 7.1);
-  assert.equal(first.windSpeed, 0.61);
-  assert.equal(first.windDeg, 81);
-  // Rain 21:00-00:00 is the values at 22:00, 23:00 and 00:00.
-  close(first.rain, 0.1);
-  // Rain 00:00-03:00 is the values at 01:00, 02:00 and 03:00.
-  close(points[1].rain, 2.2);
-  // The answer ends at 09:00, so that window has values but no rain total.
-  assert.equal(points[4].temperature, 7.6);
-  assert.equal(points[4].rain, null);
+  assert.equal(first.windSpeed, 0.63);
+  assert.equal(first.windDeg, 72);
+  // Rain 22:00-23:00 is the value at 23:00.
+  assert.equal(first.rain, 0);
+  // Rain 02:00-03:00 is the value at 03:00.
+  const at2 = points.find((point) => point.time === utc(2026, 11, 16, 2))!;
+  assert.equal(at2.rain, 1.4);
+  // The answer ends at 09:00, so that hour has values but no rain.
+  assert.equal(points.at(-1)!.temperature, 7.6);
+  assert.equal(points.at(-1)!.rain, null);
   const { searchParams } = url(fetch);
   assert.equal(searchParams.get("wind_speed_unit"), "ms");
   assert.equal(searchParams.get("timezone"), "UTC");
@@ -169,21 +176,15 @@ test("Open-Meteo returns one source per model that has data", async () => {
     ["ecmwf-ifs", "noaa-gfs"],
   );
   const ecmwf = points.filter((point) => point.source === "ecmwf-ifs");
-  assert.deepEqual(times(ecmwf), [
-    utc(2026, 11, 17, 0),
-    utc(2026, 11, 17, 3),
-    utc(2026, 11, 17, 6),
-    utc(2026, 11, 17, 9),
-    utc(2026, 11, 17, 12),
-  ]);
-  assert.equal(ecmwf[0].temperature, 4.3);
-  // 0.4 + 0.4 + 0.4 mm at 01:00, 02:00 and 03:00.
-  close(ecmwf[0].rain, 1.2);
+  assert.equal(ecmwf.length, 12);
+  assert.equal(ecmwf[0].time, utc(2026, 11, 17, 1));
+  assert.equal(ecmwf[0].temperature, 4.8);
+  // Rain 01:00-02:00 is the value at 02:00.
+  assert.equal(ecmwf[0].rain, 0.4);
   const gfs = points.filter((point) => point.source === "noaa-gfs");
-  assert.equal(gfs[0].windSpeed, 1.34);
-  assert.equal(gfs[0].windDeg, 153);
-  // 0.3 + 1.3 + 0.3 mm.
-  close(gfs[0].rain, 1.9);
+  assert.equal(gfs[0].windSpeed, 1.63);
+  assert.equal(gfs[0].windDeg, 137);
+  assert.equal(gfs[0].rain, 1.3);
   assert.equal(
     url(fetch).searchParams.get("models"),
     "ecmwf_ifs025,gfs_seamless,bom_access_global,meteoswiss_icon_seamless",
@@ -231,7 +232,7 @@ test("a bad location is stopped before any request", async () => {
   }
 });
 
-test("each source keeps the forecast range from the current window", async () => {
+test("each source keeps the forecast range from the current hour", async () => {
   const start = utc(2026, 11, 16);
   const hours = (FORECAST_DAYS + 1) * 24 + 4;
   const time = Array.from({ length: hours }, (_, i) =>
@@ -251,34 +252,28 @@ test("each source keeps the forecast range from the current window", async () =>
       }),
     ),
     ONE_MODEL,
-  ).forecast(MONZA, start + 3_600_000);
-  assert.equal(points.length, FORECAST_DAYS * 8);
-  assert.equal(points[0].time, start);
-  assert.equal(
-    points.at(-1)!.time,
-    start + FORECAST_DAYS * 24 * 3_600_000 - 3 * 3_600_000,
-  );
+  ).forecast(MONZA, start + 3_600_000 + 600_000);
+  assert.equal(points.length, FORECAST_DAYS * 24);
+  assert.equal(points[0].time, start + 3_600_000);
+  assert.equal(points.at(-1)!.time, start + FORECAST_DAYS * 24 * 3_600_000);
 });
 
 // MET Norway
 
-test("MET Norway windows, units and rain", async () => {
+test("MET Norway hours, units and rain", async () => {
   const fetch = fakeFetch(json(fixture("met-norway.json")));
   const points = await metNorway(fetch).forecast(MONZA, NOW);
-  assert.deepEqual(times(points), [
-    utc(2026, 11, 15, 21),
-    utc(2026, 11, 16, 0),
-    utc(2026, 11, 16, 3),
-    utc(2026, 11, 16, 6),
-    utc(2026, 11, 16, 9),
-  ]);
+  assert.equal(points.length, 12);
+  assert.equal(points[0].time, utc(2026, 11, 15, 22));
+  assert.equal(points.at(-1)!.time, utc(2026, 11, 16, 9));
   const [first] = points;
   assert.equal(first.source, "met-norway");
-  assert.equal(first.temperature, 5.5);
-  assert.equal(first.windSpeed, 1.0);
-  assert.equal(first.windDeg, 12.8);
-  // Rain 00:00-03:00 is next_1_hours at 00:00, 01:00 and 02:00: 0.0 + 0.2 + 0.0.
-  close(points[1].rain, 0.2);
+  assert.equal(first.temperature, 5.4);
+  assert.equal(first.windSpeed, 1.2);
+  assert.equal(first.windDeg, 5.5);
+  // Rain 01:00-02:00 is next_1_hours at 01:00.
+  assert.equal(points[3].time, utc(2026, 11, 16, 1));
+  assert.equal(points[3].rain, 0.2);
   assert.deepEqual(Object.fromEntries(url(fetch).searchParams), {
     lat: "45.62",
     lon: "9.28",
@@ -295,7 +290,7 @@ test("MET Norway sends at most 4 decimals", async () => {
   assert.equal(url(fetch).searchParams.get("lon"), "9.2823");
 });
 
-test("MET Norway keeps no rain for a window without three hourly values", async () => {
+test("MET Norway keeps no rain for an hour without an hourly value", async () => {
   const data = fixture<{
     properties: { timeseries: { data: Record<string, unknown> }[] };
   }>("met-norway.json");
@@ -304,12 +299,13 @@ test("MET Norway keeps no rain for a window without three hourly values", async 
   delete timeseries[7].data.next_1_hours;
   timeseries.splice(10, 1);
   const points = await metNorway(fakeFetch(json(data))).forecast(MONZA, NOW);
-  assert.deepEqual(
-    points.map((point) => point.rain === null),
-    [false, true, true, false, true],
-  );
-  // The temperature at the start of those windows is still there.
-  assert.equal(points[1].temperature, 6);
+  const at = (hour: number) =>
+    points.find((point) => point.time === utc(2026, 11, 16, hour));
+  assert.equal(at(1)!.rain, null);
+  // The temperature at the start of that hour is still there.
+  assert.equal(at(1)!.temperature, 6.3);
+  assert.equal(at(4), undefined);
+  assert.equal(at(2)!.rain, 0);
 });
 
 test("MET Norway unreadable answer", async () => {
@@ -319,7 +315,7 @@ test("MET Norway unreadable answer", async () => {
   );
 });
 
-test("two sources give the same windows", async () => {
+test("two sources give the same hours", async () => {
   const a = await openMeteo(
     fakeFetch(json(fixture("open-meteo.json"))),
     ONE_MODEL,
@@ -333,29 +329,27 @@ test("two sources give the same windows", async () => {
 
 // Bright Sky (DWD)
 
-test("Bright Sky windows, km/h to m/s and rain of the hour before", async () => {
+test("Bright Sky hours, km/h to m/s and rain of the hour before", async () => {
   const now = utc(2026, 11, 17, 1);
   const fetch = fakeFetch(json(fixture("bright-sky.json")));
   const points = await brightSky(fetch).forecast(MONZA, now);
-  assert.deepEqual(times(points), [
-    utc(2026, 11, 17, 0),
-    utc(2026, 11, 17, 3),
-    utc(2026, 11, 17, 6),
-    utc(2026, 11, 17, 9),
-  ]);
+  assert.equal(points.length, 9);
+  assert.equal(points[0].time, utc(2026, 11, 17, 1));
+  assert.equal(points.at(-1)!.time, utc(2026, 11, 17, 9));
   const [first] = points;
   assert.equal(first.source, "dwd-mosmix");
-  assert.equal(first.temperature, 3.7);
-  // 4.0 km/h.
-  close(first.windSpeed, 4 / 3.6);
-  assert.equal(first.windDeg, 150);
-  // Rain 00:00-03:00 is the values at 01:00, 02:00 and 03:00: 0.5 + 0.5 + 1.4.
-  close(first.rain, 2.4);
-  assert.equal(points[3].rain, null);
+  assert.equal(first.temperature, 3.6);
+  // 2.9 km/h.
+  close(first.windSpeed, 2.9 / 3.6);
+  assert.equal(first.windDeg, 80);
+  // Rain 01:00-02:00 is the value at 02:00.
+  assert.equal(first.rain, 0.5);
+  assert.equal(points[1].rain, 1.4);
+  assert.equal(points.at(-1)!.rain, null);
   const { searchParams } = url(fetch);
   assert.equal(searchParams.get("lat"), "45.62");
-  assert.equal(searchParams.get("date"), "2026-11-17T00:00:00.000Z");
-  assert.equal(searchParams.get("last_date"), "2026-11-24T00:00:00.000Z");
+  assert.equal(searchParams.get("date"), "2026-11-17T01:00:00.000Z");
+  assert.equal(searchParams.get("last_date"), "2026-11-24T01:00:00.000Z");
 });
 
 test("Bright Sky without a station nearby has nothing for the place", async () => {
@@ -393,12 +387,13 @@ test("NWS asks for the grid cell, then reads its layers", async () => {
     ],
   );
   assert.equal(points[0].source, "nws");
-  assert.equal(points[0].time, utc(2026, 11, 17, 15));
+  assert.equal(points[0].time, utc(2026, 11, 17, 13));
+  const at15 = points.find((point) => point.time === utc(2026, 11, 17, 15))!;
   // 10.56 °C at 15:00; wind 9.26 km/h for the two hours from 15:00.
-  close(points[0].temperature, 10.555555555555555);
-  close(points[0].windSpeed, 9.26 / 3.6);
-  assert.equal(points[0].windDeg, 20);
-  assert.equal(points[0].rain, 0);
+  close(at15.temperature, 10.555555555555555);
+  close(at15.windSpeed, 9.26 / 3.6);
+  assert.equal(at15.windDeg, 20);
+  assert.equal(at15.rain, 0);
   // The grid cell is remembered: the second forecast is one request.
   await provider.forecast(AUSTIN, now);
   assert.equal(fetch.calls.length, 3);
@@ -418,10 +413,10 @@ test("NWS shares a rain total evenly over its hours", async () => {
   const rain = Object.fromEntries(
     points.map((point) => [new Date(point.time).getUTCHours(), point.rain]),
   );
-  // 6 mm in 6 hours: 3 mm in each of the two windows it covers.
-  assert.equal(rain[18], 3);
-  assert.equal(rain[21], 3);
-  assert.equal(rain[15], null);
+  // 6 mm in 6 hours: 1 mm in each hour from 18:00 to 23:00.
+  assert.equal(rain[18], 1);
+  assert.equal(rain[23], 1);
+  assert.equal(rain[17], null);
 });
 
 test("NWS durations", () => {
@@ -471,29 +466,25 @@ test("NWS refuses a unit it does not know", async () => {
 
 // SMHI
 
-test("SMHI windows and hourly rain", async () => {
+test("SMHI hours and hourly rain", async () => {
   const fetch = fakeFetch(json(fixture("smhi.json")));
   const points = await smhi(fetch).forecast(
     NORRKOPING,
     utc(2026, 11, 17, 20, 10),
   );
-  assert.deepEqual(times(points), [
-    utc(2026, 11, 17, 21),
-    utc(2026, 11, 18, 0),
-    utc(2026, 11, 18, 3),
-    utc(2026, 11, 20, 6),
-    utc(2026, 11, 20, 12),
-  ]);
+  assert.equal(points[0].time, utc(2026, 11, 17, 20));
+  const at = (day: number, hour: number) =>
+    points.find((point) => point.time === utc(2026, 11, day, hour))!;
   assert.equal(points[0].source, "smhi");
-  assert.equal(points[0].temperature, 0.8);
-  assert.equal(points[0].windSpeed, 1.8);
-  assert.equal(points[0].windDeg, 5);
-  assert.equal(points[0].rain, 0);
-  // 00:00-03:00: the intervals ending at 01:00, 02:00 and 03:00: 0 + 0.1 + 0.1.
-  close(points[1].rain, 0.2);
-  // Further out the steps are 3 and 6 hours long: values, but no rain total.
-  assert.equal(points[3].temperature, -2.3);
-  assert.equal(points[3].rain, null);
+  assert.equal(at(17, 21).temperature, 0.8);
+  assert.equal(at(17, 21).windSpeed, 1.8);
+  assert.equal(at(17, 21).windDeg, 5);
+  assert.equal(at(17, 21).rain, 0);
+  // 01:00-02:00: the interval ending at 02:00.
+  assert.equal(at(18, 1).rain, 0.1);
+  // Further out the steps are 3 and 6 hours long: values, but no rain.
+  assert.equal(at(20, 6).temperature, -2.3);
+  assert.equal(at(20, 6).rain, null);
   assert.match(
     fetch.calls[0].url,
     /\/category\/snow1g\/version\/1\/geotype\/point\/lon\/16\/lat\/58\/data\.json$/,
@@ -516,7 +507,9 @@ test("SMHI missing values and unreadable answer", async () => {
     NORRKOPING,
     utc(2026, 11, 17, 20, 10),
   );
-  assert.equal(points[0].temperature, null);
+  // The second step of the answer is 21:00.
+  assert.equal(points[1].time, utc(2026, 11, 17, 21));
+  assert.equal(points[1].temperature, null);
   await assert.rejects(
     smhi(fakeFetch(json({ timeSeries: {} }))).forecast(NORRKOPING, NOW),
     { message: "SMHI sent a forecast in an unexpected format." },
@@ -525,30 +518,28 @@ test("SMHI missing values and unreadable answer", async () => {
 
 // FMI
 
-test("FMI reads the XML into windows", async () => {
+test("FMI reads the XML into hours", async () => {
   const fetch = fakeFetch(text(fixtureText("fmi.xml")));
   const points = await fmi(fetch).forecast(HELSINKI, utc(2026, 11, 17, 20, 10));
-  assert.deepEqual(times(points), [
-    utc(2026, 11, 17, 21),
-    utc(2026, 11, 18, 0),
-    utc(2026, 11, 18, 3),
-  ]);
+  const at = (day: number, hour: number) =>
+    points.find((point) => point.time === utc(2026, 11, day, hour))!;
   assert.equal(points[0].source, "fmi-harmonie");
-  assert.equal(points[0].temperature, 6.3);
-  assert.equal(points[0].windSpeed, 6.24);
-  assert.equal(points[0].windDeg, 185);
-  // 21:00-00:00: the hours ending at 22:00, 23:00 and 00:00: 0.1 + 0.2 + 0.2.
-  close(points[0].rain, 0.5);
-  // 00:00-03:00: 0.3 + 0.1 + 0.0.
-  close(points[1].rain, 0.4);
-  assert.equal(points[2].rain, null);
+  assert.equal(at(17, 21).temperature, 6.3);
+  assert.equal(at(17, 21).windSpeed, 6.24);
+  assert.equal(at(17, 21).windDeg, 185);
+  // 21:00-22:00: the hour ending at 22:00.
+  assert.equal(at(17, 21).rain, 0.1);
+  assert.equal(at(18, 0).rain, 0.3);
+  // The answer ends at 04:00: values, but no rain for the hour after.
+  assert.equal(points.at(-1)!.time, utc(2026, 11, 18, 4));
+  assert.equal(points.at(-1)!.rain, null);
   const { searchParams } = url(fetch);
   assert.equal(
     searchParams.get("storedquery_id"),
     "fmi::forecast::harmonie::surface::point::simple",
   );
   assert.equal(searchParams.get("latlon"), "60.17,24.94");
-  assert.equal(searchParams.get("starttime"), "2026-11-17T18:00:00Z");
+  assert.equal(searchParams.get("starttime"), "2026-11-17T20:00:00Z");
 });
 
 test("FMI values: NaN is missing, and other text is ignored", () => {
@@ -584,26 +575,25 @@ test("FMI answer without values", async () => {
 
 // DMI
 
-test("DMI windows, kelvin to °C and rain from the running total", async () => {
+test("DMI hours, kelvin to °C and rain from the running total", async () => {
   const fetch = fakeFetch(json(fixture("dmi.json")));
   const points = await dmi(fetch).forecast(
     COPENHAGEN,
     utc(2026, 11, 17, 15, 10),
   );
-  assert.deepEqual(times(points), [
-    utc(2026, 11, 17, 15),
-    utc(2026, 11, 17, 18),
-    utc(2026, 11, 17, 21),
-  ]);
+  assert.equal(points.length, 8);
+  assert.equal(points[0].time, utc(2026, 11, 17, 15));
   assert.equal(points[0].source, "dmi-harmonie");
   close(points[0].temperature, 278.82227 - 273.15);
   assert.equal(points[0].windSpeed, 1.9745638);
   assert.equal(points[0].windDeg, 129.27873);
   // The total goes 0, 0.00071, 0.00097, 0.00068: two small steps up, then a
   // wobble down that counts as no rain.
-  close(points[0].rain, 0.00097465515);
-  // The answer ends at 22:00, so the 21:00 window has no rain total.
-  assert.equal(points[2].rain, null);
+  close(points[0].rain, 0.00070762634);
+  close(points[1].rain, 0.00026702881);
+  assert.equal(points[2].rain, 0);
+  // The answer ends at 22:00, so that hour has no rain.
+  assert.equal(points.at(-1)!.rain, null);
   assert.equal(url(fetch).searchParams.get("coords"), "POINT(12.5 55.7)");
   assert.equal(url(fetch).searchParams.get("crs"), "crs84");
 });
@@ -620,10 +610,11 @@ test("DMI: a total that drops is a new model run, not rain", async () => {
     COPENHAGEN,
     utc(2026, 11, 17, 15, 10),
   );
-  // 15:00-18:00: 1 + 1.5 + 1.5.
-  assert.equal(points[0].rain, 4);
-  // 18:00-19:00 falls from 4 to 0: that hour is not known.
-  assert.equal(points[1].rain, null);
+  assert.deepEqual(
+    points.slice(0, 5).map((point) => point.rain),
+    // 18:00-19:00 falls from 4 to 0: that hour is not known.
+    [1, 1.5, 1.5, null, 0.5],
+  );
 });
 
 test("DMI answers with its nearest grid point: too far means not covered", async () => {
@@ -670,7 +661,7 @@ const GEOSPHERE = {
   ],
 };
 
-test("GeoSphere windows, wind from its two parts and rain", async () => {
+test("GeoSphere hours, wind from its two parts and rain", async () => {
   const fetch = fakeFetch(json(GEOSPHERE));
   const points = await geosphere(fetch).forecast(
     SPIELBERG,
@@ -678,17 +669,21 @@ test("GeoSphere windows, wind from its two parts and rain", async () => {
   );
   assert.deepEqual(times(points), [
     utc(2026, 11, 17, 18),
+    utc(2026, 11, 17, 19),
+    utc(2026, 11, 17, 20),
     utc(2026, 11, 17, 21),
+    utc(2026, 11, 17, 22),
   ]);
   assert.equal(points[0].source, "geosphere");
   assert.equal(points[0].temperature, 3.1);
   // 3 m/s to the east and 4 m/s to the north: 5 m/s, from the south-west.
   close(points[0].windSpeed, 5);
   close(points[0].windDeg, 216.86989764584402);
-  // 18:00-21:00: the hours ending at 19:00, 20:00 and 21:00: 0.4 + 0.6 + 1.
-  close(points[0].rain, 2);
-  assert.equal(points[1].windSpeed, 5);
-  assert.equal(points[1].rain, null);
+  // 18:00-19:00: the hour ending at 19:00.
+  assert.equal(points[0].rain, 0.4);
+  assert.equal(points[3].windSpeed, 5);
+  assert.equal(points[3].rain, 0);
+  assert.equal(points[4].rain, null);
   assert.equal(url(fetch).searchParams.get("parameters"), "2t,10u,10v,tp");
   assert.equal(url(fetch).searchParams.get("lat_lon"), "47.2197,14.7647");
 });

@@ -1,5 +1,5 @@
-// The page helpers on the invented forecast. Its 8 windows are Friday 13 November
-// 2026, 00:00 to 21:00 UTC, and every source says 225° (SW).
+// The page helpers on the invented forecast. Its 8 hours are Friday 13 November
+// 2026, every 3 hours from 00:00 to 21:00 UTC, and every source says 225° (SW).
 
 import assert from "node:assert/strict";
 import { test } from "node:test";
@@ -7,12 +7,15 @@ import {
   rainText,
   rangeText,
   sessionMessage,
-  sessionWindowRows,
   sourceRows,
   sourcesText,
 } from "../web/src/lib/dashboard.ts";
 import { niceTicks, unitFormat } from "../web/src/lib/format.ts";
-import { combineForecasts, combineWindow } from "../web/src/lib/stats.ts";
+import {
+  combineForecasts,
+  combineWindow,
+  periodPoints,
+} from "../web/src/lib/stats.ts";
 import {
   compassSector,
   directionVote,
@@ -21,7 +24,9 @@ import {
 } from "../web/src/lib/wind.ts";
 import { fakeTable, utc } from "./helpers.ts";
 
-const FP1 = utc(2026, 11, 13, 8); // in the 06:00 window
+const FP1 = utc(2026, 11, 13, 6);
+const FP1_END = utc(2026, 11, 13, 7);
+const fp1Rows = () => periodPoints(fakeTable(), FP1, FP1_END);
 const metric = unitFormat({ temperature: "c", wind: "kmh" });
 
 test("compass sector of the main directions", () => {
@@ -60,8 +65,8 @@ test("mean direction across north", () => {
   assert.equal(meanDirection([90, 270]), null);
 });
 
-test("session window rows pick the window of the session", () => {
-  const rows = sessionWindowRows(fakeTable(), FP1);
+test("the rows of a session are its hours, one per source", () => {
+  const rows = fp1Rows();
   assert.equal(rows.length, 3);
   assert.deepEqual(
     rows.map((row) => row.temperature),
@@ -70,21 +75,24 @@ test("session window rows pick the window of the session", () => {
 });
 
 test("session message", () => {
-  const rows = sessionWindowRows(fakeTable(), FP1);
+  const rows = fp1Rows();
   const thursday = utc(2026, 11, 12, 10);
   const saturday = utc(2026, 11, 14, 10);
-  assert.equal(sessionMessage(FP1, thursday, rows), null);
-  assert.equal(sessionMessage(FP1, saturday, rows), "This session is over.");
+  assert.equal(sessionMessage(FP1_END, thursday, rows), null);
   assert.equal(
-    sessionMessage(FP1, thursday, []),
+    sessionMessage(FP1_END, saturday, rows),
+    "This session is over.",
+  );
+  assert.equal(
+    sessionMessage(FP1_END, thursday, []),
     "No forecast reaches this session yet.",
   );
-  // A session that started earlier in the current window is not over yet.
-  assert.equal(sessionMessage(FP1, utc(2026, 11, 13, 8, 30), rows), null);
+  // A session that is under way is not over yet.
+  assert.equal(sessionMessage(FP1_END, utc(2026, 11, 13, 6, 30), rows), null);
 });
 
 test("source rows for FP1, one group per centre", () => {
-  const groups = sourceRows(sessionWindowRows(fakeTable(), FP1));
+  const groups = sourceRows(fp1Rows());
   assert.deepEqual(
     groups.map((group) => [group.centre, group.rows.map((row) => row.label)]),
     [
@@ -94,7 +102,7 @@ test("source rows for FP1, one group per centre", () => {
     ],
   );
   const rows = groups.flatMap((group) => group.rows);
-  // The 06:00 window: wind 5 m/s for every source, from 225° (SW).
+  // 06:00: wind 5 m/s for every source, from 225° (SW).
   assert.deepEqual(
     rows.map((row) => row.windSpeed),
     [5, 5, 5],
@@ -177,9 +185,9 @@ test("range text in the chosen units", () => {
 
 test("rain text counts the centres that expect rain", () => {
   const combined = combineForecasts(fakeTable());
-  assert.equal(rainText(combined[0]), "0 of 3 expect ≥ 0.5 mm");
-  assert.equal(rainText(combined[3]), "1 of 3 expect ≥ 0.5 mm");
-  assert.equal(rainText(combined[4]), "3 of 3 expect ≥ 0.5 mm");
+  assert.equal(rainText(combined[0]), "0 of 3 expect rain");
+  assert.equal(rainText(combined[6]), "1 of 3 expect rain");
+  assert.equal(rainText(combined[4]), "3 of 3 expect rain");
   const none = combineWindow(0, [
     {
       source: "smhi",

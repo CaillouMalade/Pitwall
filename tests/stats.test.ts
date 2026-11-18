@@ -131,19 +131,19 @@ test("first window, by hand", () => {
 });
 
 test("rain: centres expecting at least the threshold", () => {
-  assert.equal(RAIN_THRESHOLD_MM, 0.5);
+  assert.equal(RAIN_THRESHOLD_MM, 0.2);
   const combined = combineForecasts(fakeTable());
-  // Window 3 has 0.4, 0.6 and 0.2 mm; window 4 has 1.2, 1.5 and 0.9 mm.
+  // Hour 2 has 0, 0.1 and 0 mm; hour 3 has 0.4, 0.6 and 0.2 mm; hour 6 has 0, 0 and 0.2 mm.
   assert.deepEqual(
     combined.map((window) => window.rainVotes),
-    [0, 0, 0, 1, 3, 3, 0, 0],
+    [0, 0, 0, 3, 3, 3, 1, 0],
   );
   assert.ok(combined.every((window) => window.rainVoters === 3));
   assert.equal(combined[3].rain.value, 0.4);
 });
 
-test("0.2 mm and 1.2 mm is one of two, not a 100% chance of rain", () => {
-  const window = combineWindow(0, points([{ rain: 0.2 }, { rain: 1.2 }]));
+test("0.1 mm and 1.3 mm is one of two, not a 100% chance of rain", () => {
+  const window = combineWindow(0, points([{ rain: 0.1 }, { rain: 1.3 }]));
   assert.equal(window.rainVotes, 1);
   assert.equal(window.rainVoters, 2);
   near(window.rain.value, 0.7);

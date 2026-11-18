@@ -152,7 +152,7 @@ test("the real adapters: one answers, the other is rate limited", async () => {
     ],
     now,
   );
-  assert.equal(points.length, 5);
+  assert.equal(points.length, 12);
   assert.deepEqual(failures, [
     "MET Norway: Too many requests to the weather service. Wait a minute and try again.",
   ]);

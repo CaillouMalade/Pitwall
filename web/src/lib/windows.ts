@@ -1,25 +1,26 @@
-// The 3-hour UTC windows (00, 03, ... 21) every forecast source is cut into.
+// The hourly steps every forecast source is cut into. A "window" is one hour,
+// named by its start; it was 3 hours until 3.0.0-preview.1.
 
 import type { ForecastPoint } from "./types.ts";
 
 export const HOUR = 3_600_000;
 export const DAY = 24 * HOUR;
-export const WINDOW_HOURS = 3;
+export const WINDOW_HOURS = 1;
 export const WINDOW = WINDOW_HOURS * HOUR;
 /** How far ahead forecasts are kept. Most sources thin out well before this. */
 export const FORECAST_DAYS = 7;
 
-/** True for 00:00, 03:00, ... 21:00 UTC. */
+/** True for a full hour. */
 export function isWindowStart(time: number): boolean {
   return time % WINDOW === 0;
 }
 
-/** The start of the 3-hour window a time falls in (14:20 gives 12:00). */
+/** The start of the hour a time falls in (14:20 gives 14:00). */
 export function windowStart(time: number): number {
   return Math.floor(time / WINDOW) * WINDOW;
 }
 
-/** The rain of the hours in one window, or null if any hour is missing. */
+/** The rain of several hours, or null if any hour is missing. */
 export function sumRain(
   amounts: readonly (number | null | undefined)[],
 ): number | null {
@@ -50,11 +51,10 @@ export interface Instant {
 }
 
 /**
- * Hourly values as 3-hour windows. `instants` holds the values at a moment,
- * `rainByHour` the rain that falls in the hour starting at its key. A window
- * takes the values at its start and the rain of its 3 hours; when one of those
- * hours is missing the rain stays null. Windows where the source says nothing
- * at all are left out.
+ * A source's hourly values as points. `instants` holds the values at a moment,
+ * `rainByHour` the rain that falls in the hour starting at its key. An hour takes
+ * the values at its start and the rain of that hour. Hours where the source says
+ * nothing at all are left out, and so are values that are not on a full hour.
  */
 export function hourlyToWindows(
   source: string,
@@ -63,22 +63,18 @@ export function hourlyToWindows(
 ): ForecastPoint[] {
   const starts = new Set<number>();
   for (const time of instants.keys()) if (isWindowStart(time)) starts.add(time);
-  for (const time of rainByHour.keys()) starts.add(windowStart(time));
+  for (const time of rainByHour.keys())
+    if (isWindowStart(time)) starts.add(time);
   const points: ForecastPoint[] = [];
   for (const time of [...starts].sort((a, b) => a - b)) {
     const instant = instants.get(time);
-    const rain = sumRain([
-      rainByHour.get(time),
-      rainByHour.get(time + HOUR),
-      rainByHour.get(time + 2 * HOUR),
-    ]);
     const point: ForecastPoint = {
       source,
       time,
       temperature: instant?.temperature ?? null,
       windSpeed: instant?.windSpeed ?? null,
       windDeg: instant?.windDeg ?? null,
-      rain,
+      rain: rainByHour.get(time) ?? null,
     };
     if (
       point.temperature === null &&

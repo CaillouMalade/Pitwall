@@ -6,12 +6,7 @@ import {
   sourceLabel,
   sourceProvider,
 } from "./sources.ts";
-import {
-  MIN_FOR_RANGE,
-  RAIN_THRESHOLD_MM,
-  type CombinedWindow,
-  type Estimate,
-} from "./stats.ts";
+import { MIN_FOR_RANGE, type CombinedWindow, type Estimate } from "./stats.ts";
 import type { ForecastPoint } from "./types.ts";
 import { compassSector, type Sector } from "./wind.ts";
 import { windowStart } from "./windows.ts";
@@ -37,10 +32,10 @@ export function rangeText(
   return `80% range: ${show(value.low)} to ${show(value.high)} ${unit}`;
 }
 
-/** "3 of 9 expect ≥ 0.5 mm" */
+/** "3 of 9 expect rain" */
 export function rainText(window: CombinedWindow): string {
   if (window.rainVoters === 0) return "No value";
-  return `${window.rainVotes} of ${window.rainVoters} expect ≥ ${RAIN_THRESHOLD_MM} mm`;
+  return `${window.rainVotes} of ${window.rainVoters} expect rain`;
 }
 
 /** "14 sources from 9 centres" */
@@ -51,23 +46,13 @@ export function sourcesText(window: CombinedWindow): string {
     : `${sources} from ${window.centres} centre${window.centres === 1 ? "" : "s"}`;
 }
 
-/** The forecast rows (one per source) of the 3-hour window a session starts in. */
-export function sessionWindowRows<T extends { time: number }>(
-  points: readonly T[],
-  sessionStart: number,
-): T[] {
-  const start = windowStart(sessionStart);
-  return points.filter((point) => point.time === start);
-}
-
 /** The message to show instead of a forecast, or null when there is one to show. */
 export function sessionMessage(
-  sessionStart: number,
+  sessionEnd: number,
   now: number,
   rows: readonly unknown[],
 ): string | null {
-  if (windowStart(sessionStart) < windowStart(now))
-    return "This session is over.";
+  if (sessionEnd <= windowStart(now)) return "This session is over.";
   if (rows.length === 0) return "No forecast reaches this session yet.";
   return null;
 }
@@ -96,7 +81,7 @@ export interface CentreRows {
   rows: SourceRow[];
 }
 
-/** The sources of one window, grouped by centre in order of first appearance. */
+/** The sources of one hour or session, grouped by centre in order of first appearance. */
 export function sourceRows(
   rows: readonly ForecastPoint[],
   centre: (source: string) => string = centreOf,

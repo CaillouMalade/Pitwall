@@ -8,6 +8,7 @@ export const GRADE1_TRACKS: readonly Track[] = [
     country: "Austria",
     latitude: 47.2197,
     longitude: 14.7647,
+    timezone: "Europe/Vienna",
   },
   {
     id: "spa",
@@ -15,6 +16,7 @@ export const GRADE1_TRACKS: readonly Track[] = [
     country: "Belgium",
     latitude: 50.4372,
     longitude: 5.9714,
+    timezone: "Europe/Brussels",
   },
   {
     id: "paul-ricard",
@@ -22,6 +24,7 @@ export const GRADE1_TRACKS: readonly Track[] = [
     country: "France",
     latitude: 43.2506,
     longitude: 5.7917,
+    timezone: "Europe/Paris",
   },
   {
     id: "magny-cours",
@@ -29,6 +32,7 @@ export const GRADE1_TRACKS: readonly Track[] = [
     country: "France",
     latitude: 46.8642,
     longitude: 3.1636,
+    timezone: "Europe/Paris",
   },
   {
     id: "hockenheim",
@@ -36,6 +40,7 @@ export const GRADE1_TRACKS: readonly Track[] = [
     country: "Germany",
     latitude: 49.3278,
     longitude: 8.5656,
+    timezone: "Europe/Berlin",
   },
   {
     id: "nurburgring",
@@ -43,6 +48,7 @@ export const GRADE1_TRACKS: readonly Track[] = [
     country: "Germany",
     latitude: 50.3356,
     longitude: 6.9475,
+    timezone: "Europe/Berlin",
   },
   {
     id: "hungaroring",
@@ -50,6 +56,7 @@ export const GRADE1_TRACKS: readonly Track[] = [
     country: "Hungary",
     latitude: 47.5789,
     longitude: 19.2486,
+    timezone: "Europe/Budapest",
   },
   {
     id: "monza",
@@ -57,6 +64,7 @@ export const GRADE1_TRACKS: readonly Track[] = [
     country: "Italy",
     latitude: 45.6191,
     longitude: 9.2822,
+    timezone: "Europe/Rome",
   },
   {
     id: "imola",
@@ -64,6 +72,7 @@ export const GRADE1_TRACKS: readonly Track[] = [
     country: "Italy",
     latitude: 44.3439,
     longitude: 11.7167,
+    timezone: "Europe/Rome",
   },
   {
     id: "mugello",
@@ -71,6 +80,7 @@ export const GRADE1_TRACKS: readonly Track[] = [
     country: "Italy",
     latitude: 43.9975,
     longitude: 11.3719,
+    timezone: "Europe/Rome",
   },
   {
     id: "zandvoort",
@@ -78,6 +88,7 @@ export const GRADE1_TRACKS: readonly Track[] = [
     country: "Netherlands",
     latitude: 52.3888,
     longitude: 4.5409,
+    timezone: "Europe/Amsterdam",
   },
   {
     id: "portimao",
@@ -85,6 +96,7 @@ export const GRADE1_TRACKS: readonly Track[] = [
     country: "Portugal",
     latitude: 37.2319,
     longitude: -8.6267,
+    timezone: "Europe/Lisbon",
   },
   {
     id: "barcelona",
@@ -92,6 +104,7 @@ export const GRADE1_TRACKS: readonly Track[] = [
     country: "Spain",
     latitude: 41.57,
     longitude: 2.2611,
+    timezone: "Europe/Madrid",
   },
   {
     id: "alcaniz",
@@ -99,6 +112,7 @@ export const GRADE1_TRACKS: readonly Track[] = [
     country: "Spain",
     latitude: 41.0786,
     longitude: -0.2033,
+    timezone: "Europe/Madrid",
   },
   {
     id: "jerez",
@@ -106,6 +120,7 @@ export const GRADE1_TRACKS: readonly Track[] = [
     country: "Spain",
     latitude: 36.7083,
     longitude: -6.0342,
+    timezone: "Europe/Madrid",
   },
   {
     id: "valencia",
@@ -113,5 +128,6 @@ export const GRADE1_TRACKS: readonly Track[] = [
     country: "Spain",
     latitude: 39.4889,
     longitude: -0.6264,
+    timezone: "Europe/Madrid",
   },
 ];

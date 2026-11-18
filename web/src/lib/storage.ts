@@ -2,7 +2,14 @@
 // weekend, a few preferences and the last forecast of the tracks last opened.
 // Every access is guarded, so a blocked or full storage never stops the app.
 
-import { isPlan, type WeekendPlan } from "./sessions.ts";
+import {
+  MAX_TYPES,
+  readPlan,
+  readType,
+  STANDARD_TYPE,
+  type WeekendPlan,
+  type WeekendType,
+} from "./sessions.ts";
 import {
   PROVIDER_LABELS,
   PROVIDERS_OFF_BY_DEFAULT,
@@ -19,6 +26,9 @@ export const WEEKENDS_KEY = "pitwall-weekends";
 export const PROVIDERS_OFF_KEY = "pitwall-sources-off";
 export const WELCOMED_KEY = "pitwall-welcomed";
 export const SNAPSHOTS_KEY = "pitwall-forecasts";
+export const WEEKEND_TYPES_KEY = "pitwall-weekend-types";
+export const TRACKS_COLLAPSED_KEY = "pitwall-tracks-collapsed";
+export const OUTLINES_KEY = "pitwall-outlines";
 
 export interface KeyValueStore {
   getItem(key: string): string | null;
@@ -78,7 +88,8 @@ function isTrack(value: unknown): value is Track {
     Number.isFinite(track.latitude) &&
     Math.abs(track.latitude) <= 90 &&
     Number.isFinite(track.longitude) &&
-    Math.abs(track.longitude) <= 180
+    Math.abs(track.longitude) <= 180 &&
+    (track.timezone === undefined || typeof track.timezone === "string")
   );
 }
 
@@ -106,11 +117,12 @@ export function loadPlans(store = defaultStore()): Record<string, WeekendPlan> {
   const value = readJson(WEEKENDS_KEY, store);
   if (typeof value !== "object" || value === null || Array.isArray(value))
     return {};
-  return Object.fromEntries(
-    Object.entries(value).filter((entry): entry is [string, WeekendPlan] =>
-      isPlan(entry[1]),
-    ),
-  );
+  const plans: Record<string, WeekendPlan> = {};
+  for (const [id, saved] of Object.entries(value)) {
+    const plan = readPlan(saved);
+    if (plan) plans[id] = plan;
+  }
+  return plans;
 }
 
 /** Save one track's weekend, or with null go back to the default. */
@@ -198,4 +210,84 @@ export function saveSnapshot(
     JSON.stringify(Object.fromEntries(kept)),
     store,
   );
+}
+
+// Weekend types: named lists of sessions, and which one new tracks start with.
+
+export interface WeekendTypes {
+  /** The standard type first, then the user's own. */
+  types: WeekendType[];
+  defaultId: string;
+}
+
+export function loadWeekendTypes(store = defaultStore()): WeekendTypes {
+  const value = readJson(WEEKEND_TYPES_KEY, store) as {
+    types?: unknown;
+    defaultId?: unknown;
+  } | null;
+  const own: WeekendType[] = [];
+  if (value && Array.isArray(value.types))
+    for (const item of value.types.slice(0, MAX_TYPES)) {
+      const type = readType(item);
+      if (type && !own.some((other) => other.id === type.id)) own.push(type);
+    }
+  const types = [STANDARD_TYPE, ...own];
+  const defaultId = types.some((type) => type.id === value?.defaultId)
+    ? (value!.defaultId as string)
+    : STANDARD_TYPE.id;
+  return { types, defaultId };
+}
+
+/** Save the user's own types and the default; throws when it can't be saved. */
+export function saveWeekendTypes(
+  next: WeekendTypes,
+  store = defaultStore(),
+): WeekendTypes {
+  const own = next.types.filter((type) => type.id !== STANDARD_TYPE.id);
+  const defaultId = next.types.some((type) => type.id === next.defaultId)
+    ? next.defaultId
+    : STANDARD_TYPE.id;
+  if (
+    !writeText(
+      WEEKEND_TYPES_KEY,
+      JSON.stringify({ types: own, defaultId }),
+      store,
+    )
+  )
+    throw new Error(SAVE_FAILED_MESSAGE);
+  return { types: [STANDARD_TYPE, ...own], defaultId };
+}
+
+// Small things kept between visits, each under its own name.
+
+export function loadKept<T>(
+  key: string,
+  check: (value: unknown) => value is T,
+  store = defaultStore(),
+): Record<string, T> {
+  const value = readJson(key, store);
+  if (typeof value !== "object" || value === null || Array.isArray(value))
+    return {};
+  return Object.fromEntries(
+    Object.entries(value).filter((entry): entry is [string, T] =>
+      check(entry[1]),
+    ),
+  );
+}
+
+/** Keep one more entry, dropping the oldest when there are more than `max`. */
+export function keep<T>(
+  key: string,
+  name: string,
+  value: T,
+  check: (value: unknown) => value is T,
+  max: number,
+  store = defaultStore(),
+): boolean {
+  const all = loadKept(key, check, store);
+  delete all[name];
+  const entries = [...Object.entries(all), [name, value] as [string, T]].slice(
+    -max,
+  );
+  return writeText(key, JSON.stringify(Object.fromEntries(entries)), store);
 }

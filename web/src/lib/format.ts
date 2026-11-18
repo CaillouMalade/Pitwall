@@ -1,4 +1,4 @@
-// Every time in the app is shown in UTC, like the sessions.
+// Times are shown in the track's own time zone; values in the user's units.
 
 import {
   temperatureLabel,
@@ -10,32 +10,74 @@ import {
   type Units,
 } from "./units.ts";
 
-const make = (options: Intl.DateTimeFormatOptions) =>
-  new Intl.DateTimeFormat("en-GB", { timeZone: "UTC", ...options });
+const formats = new Map<string, Intl.DateTimeFormat>();
 
-const dayTime = make({
-  weekday: "short",
-  day: "numeric",
-  month: "short",
-  hour: "2-digit",
-  minute: "2-digit",
-});
-const dayOnly = make({ weekday: "short", day: "numeric", month: "short" });
-const shortDay = make({ day: "numeric", month: "short" });
-const clock = make({ hour: "2-digit", minute: "2-digit" });
+function make(zone: string, name: string, options: Intl.DateTimeFormatOptions) {
+  const key = `${zone}|${name}`;
+  let format = formats.get(key);
+  if (!format) {
+    format = new Intl.DateTimeFormat("en-GB", {
+      timeZone: zone,
+      hourCycle: "h23",
+      ...options,
+    });
+    formats.set(key, format);
+  }
+  return format;
+}
 
 /** "Tue 18 Nov, 08:00" */
-export const formatDayTime = (time: number) => dayTime.format(time);
+export const formatDayTime = (time: number, zone = "UTC") =>
+  make(zone, "dayTime", {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(time);
 /** "Tue 18 Nov" */
-export const formatDay = (time: number) => dayOnly.format(time);
+export const formatDay = (time: number, zone = "UTC") =>
+  make(zone, "day", {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+  }).format(time);
+/** "Tue" */
+export const formatWeekday = (time: number, zone = "UTC") =>
+  make(zone, "weekday", { weekday: "short" }).format(time);
 /** "18 Nov", for chart axes. */
-export const formatShortDay = (time: number) => shortDay.format(time);
+export const formatShortDay = (time: number, zone = "UTC") =>
+  make(zone, "shortDay", { day: "numeric", month: "short" }).format(time);
 /** "08:00" */
-export const formatClock = (time: number) => clock.format(time);
+export const formatClock = (time: number, zone = "UTC") =>
+  make(zone, "clock", { hour: "2-digit", minute: "2-digit" }).format(time);
 
 /** A "2026-11-01" day as "1 Nov". */
 export const formatIsoDay = (day: string) =>
-  shortDay.format(Date.parse(day + "T00:00:00Z"));
+  formatShortDay(Date.parse(day + "T00:00:00Z"));
+/** A "2026-11-01" day as "Sun 1 Nov". */
+export const formatIsoWeekday = (day: string) =>
+  formatDay(Date.parse(day + "T00:00:00Z"));
+/** A "2026-11-01" day as "1 Nov 2026". */
+export const formatIsoDate = (day: string) =>
+  make("UTC", "date", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  }).format(Date.parse(day + "T00:00:00Z"));
+
+/** "in 2 d 4 h", "in 35 min", "now" or "3 h ago". */
+export function formatCountdown(from: number, to: number): string {
+  const minutes = Math.round(Math.abs(to - from) / 60_000);
+  if (minutes < 1) return "now";
+  const text =
+    minutes < 60
+      ? `${minutes} min`
+      : minutes < 48 * 60
+        ? `${Math.floor(minutes / 60)} h${minutes % 60 >= 1 && minutes < 600 ? ` ${minutes % 60} min` : ""}`
+        : `${Math.floor(minutes / 1440)} d ${Math.floor((minutes % 1440) / 60)} h`;
+  return to >= from ? `in ${text}` : `${text} ago`;
+}
 
 /** A number with fixed decimals, without "-0.0" for values that round to zero. */
 export function formatNumber(value: number, digits = 1): string {
