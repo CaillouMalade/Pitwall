@@ -9,32 +9,35 @@ It asks up to 19 forecast sources from 14 forecasting centres about the same pla
 Three things decide a session, so Pitwall shows those three:
 
 - **Temperature**, for tyres and cooling, and how it moves through the weekend.
-- **Rain**, where timing is everything: how much, and how many of the forecasts expect it.
+- **Rain**, where timing is everything: how much, hour by hour, and how many of the forecasts expect it.
 - **Wind**, strength and direction, because of what it does to the car in fast corners.
 
 Organised around the weekend:
 
-- **Weekend overview.** Rain, temperature and wind over the three days, each with the range between the forecasts and the sessions marked. Below, which sources answered, the circuit from above and the last two hours of rain radar.
-- **Session dashboard.** One session at a time: the combined answer, then every source next to its forecasting centre.
-- **History.** What the weather did at the track over the last 14, 30 or 90 days.
-- **Track comparison.** 2 to 4 tracks over the same days, wettest first.
+- **Weekend overview.** The circuit's layout, each session at a glance, then rain, temperature and wind hour by hour over the three days, each with the range between the forecasts. Below, which sources answered and the circuit from above.
+- **Session dashboard.** One session at a time. A verdict ("Could go either way: 5 of 9 centres expect rain") with how far the forecasts agree. A map of the forecast rain around the circuit with play and a slider, or the rain radar of the last two hours. The wind over the circuit, with headwind, tailwind and crosswind on each straight. The same charts as the overview around the session, rain in 15-minute steps, every centre as a dot on a line, and every source in a table.
+- **History.** What is normal for the weekend's dates over the last 20 years, the last 14, 30 or 90 days, or any dates since 1940 hour by hour.
+- **Track comparison.** 2 to 4 tracks over the same days, on the same scales, wettest first.
+
+History and Track comparison export to CSV by the hour, to line up with your own data from a weekend.
 
 ## Tracks and sessions
 
-The 16 FIA Grade 1 circuits in EU countries are built in. **Add a track anywhere** by name, latitude and longitude; tracks you add are kept on your computer and can be edited or deleted.
+The 16 FIA Grade 1 circuits in EU countries are built in, with their outlines. **Add a track anywhere** by name, latitude and longitude; tracks you add are kept on your computer and can be edited or deleted. The track list folds away when you do not need it.
 
-Every track starts with the same weekend: three days from tomorrow, FP1 and FP3 at 08:00, FP2 and Qualifying at 14:00, Race at 13:00, in UTC. **Each track can have its own weekend:** the date of its first day, and the name, day and time of up to 8 sessions.
+Every track starts with the default weekend type: three days from tomorrow, FP1 and FP3 at 08:00, FP2 and Qualifying at 14:00, Race at 13:00 for two hours. **Each track can have its own weekend:** the date of its first day, and the name, day, start and length of up to 8 sessions. **A weekend can be saved as a type** ("Sprint weekend", "Test day"), reused on any track, and made the default.
 
-Temperatures show in °C or °F and wind in km/h, mph or m/s. All times are UTC.
+All times are the track's own local time. Temperatures show in °C or °F and wind in km/h, mph or m/s.
 
 ## How the answer is made
 
-Each source is cut into the same 3-hour UTC windows. Sources from the same forecasting centre are merged first, so a centre with three feeds counts once. Then, for each window:
+Every source is put on the same hourly steps. Sources from the same forecasting centre are merged first, so a centre with three feeds counts once. Then, for each hour and for each session:
 
 - the **combined value** is the median of the centres;
 - the **80% range** is their 10th to 90th percentile, shown from 3 centres up;
-- **rain** adds a count, such as "3 of 9 expect ≥ 0.5 mm";
-- **wind direction** is a vote between 8 compass sectors, such as "7 of 9 agree: SW".
+- **rain** adds a count, such as "3 of 9 expect rain" (0.2 mm or more in an hour);
+- **wind direction** is a vote between 8 compass sectors, such as "7 of 9 agree: SW";
+- a session gets a grade, from "forecasts agree" to "forecasts disagree".
 
 The range says how far the forecasts are apart. It is not a probability for the weather: forecasts can agree and still be wrong. [docs/METHOD.md](docs/METHOD.md) explains each choice.
 
@@ -51,13 +54,13 @@ The range says how far the forecasts are apart. It is not a probability for the 
 | DMI                         | Harmonie                                                                                                                                                      | North-west Europe                          |
 | GeoSphere Austria           | 1 km model, off by default                                                                                                                                    | Alps and central Europe                    |
 
-A service that fails is skipped with a warning and the others still load; one that does not cover a track is not asked. History comes from Open-Meteo's reanalysis archive, the radar from RainViewer, the maps from OpenStreetMap and the satellite view from Sentinel-2 cloudless by EOX.
+A service that fails is skipped with a warning and the others still load; one that does not cover a track is not asked. History comes from Open-Meteo's reanalysis archive, the rain map of a session from Open-Meteo, the radar from RainViewer, the maps and circuit outlines from OpenStreetMap and the satellite view from Sentinel-2 cloudless by EOX.
 
 Each service has its own terms. [docs/DATA_SOURCES.md](docs/DATA_SOURCES.md) lists what was read, what each one allows, and the points that are not confirmed. **Several sources are free only because Pitwall is free and carries no advertising.**
 
 ## Without a connection
 
-Pitwall shows the last forecast it loaded for the track, and says when it was fetched. History falls back on a log of observations that comes with the app, for the built-in circuits that are in it.
+Pitwall shows the last forecast it loaded for the track, and says when it was fetched. The dates you already looked at in History are kept, and recent days fall back on a log of observations that comes with the app, for the built-in circuits that are in it.
 
 ## Privacy
 

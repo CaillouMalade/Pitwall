@@ -17,7 +17,7 @@ The desktop build also bundles Electron and Chromium/Node. Their distributed `EL
 - **Danish Meteorological Institute:** open data under [CC BY 4.0](https://www.dmi.dk/friedata/dokumentation/terms-of-use).
 - **GeoSphere Austria:** data under [CC BY 4.0](https://dataset.api.hub.geosphere.at/v1/docs/user-guide/license.html).
 
-Pitwall changes this data before showing it: it converts units, turns hourly values into 3-hour windows, keeps missing values missing, merges sources of the same forecasting centre and combines the centres. See [docs/METHOD.md](docs/METHOD.md).
+Pitwall changes this data before showing it: it converts units, puts every source on the same hourly steps, keeps missing values missing, merges sources of the same forecasting centre and combines the centres. See [docs/METHOD.md](docs/METHOD.md).
 
 ## Past weather
 
@@ -28,10 +28,11 @@ Pitwall changes this data before showing it: it converts units, turns hourly val
 
 - **RainViewer:** weather data by [RainViewer](https://www.rainviewer.com/), from its [Weather Maps API](https://www.rainviewer.com/api/weather-maps-api.html). The credit stays on the map.
 - **OpenStreetMap:** base tiles © OpenStreetMap contributors, data under [ODbL 1.0](https://www.openstreetmap.org/copyright). The [tile usage policy](https://operations.osmfoundation.org/policies/tiles/) applies; Pitwall does not bulk-download or precache tiles.
+- **Circuit outlines:** the racing lines in `web/src/data/track-outlines.json` are built from OpenStreetMap data, © OpenStreetMap contributors, under [ODbL 1.0](https://www.openstreetmap.org/copyright); that file is offered under the same licence. The outline of a track you add comes from the [Overpass API](https://overpass-api.de/), when you ask for it.
 - **Sentinel-2 cloudless:** [https://s2maps.eu](https://s2maps.eu) by EOX IT Services GmbH (contains modified Copernicus Sentinel data 2024), under [CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/) for non-commercial use.
 
 Track names are descriptive; Pitwall does not claim affiliation with circuits, championships, weather agencies or map providers.
 
 ## Software dependencies
 
-Production dependency licences and copyright notices are retained in [THIRD_PARTY_NOTICES.txt](web/public/THIRD_PARTY_NOTICES.txt), generated from the locked dependencies by `npm run notices` and included in the build. There is no external font or script CDN.
+Production dependency licences and copyright notices are retained in [THIRD_PARTY_NOTICES.txt](web/public/THIRD_PARTY_NOTICES.txt), generated from the locked dependencies by `npm run notices` and included in the build. The app's fonts, Space Grotesk and Inter, are bundled with it under the SIL Open Font License 1.1; their notices are in the same file. There is no external font or script CDN.

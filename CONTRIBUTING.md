@@ -19,7 +19,7 @@ npm run test:e2e
 ## Weather rules
 
 - Keep missing values missing; never turn an unknown rain amount into 0 mm.
-- Compare sources on the same 3-hour UTC windows, and count each forecasting centre once ([docs/METHOD.md](docs/METHOD.md)). Never average wind directions across centres.
+- Compare sources on the same hourly steps, and count each forecasting centre once ([docs/METHOD.md](docs/METHOD.md)). Never average wind directions across centres.
 - Show every failure as a fixed, user-facing message, never a raw error or URL.
 - Respect each service's quotas, terms and attribution. A new source needs its terms read and written up in [docs/DATA_SOURCES.md](docs/DATA_SOURCES.md); one that needs a key must be optional and off by default. Tests use saved or invented answers and never call the services.
 

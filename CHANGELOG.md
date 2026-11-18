@@ -1,5 +1,45 @@
 # Changelog
 
+## 3.0.0-preview.2 — By the hour, by the session
+
+### Forecasts
+
+- Hourly steps instead of 3-hour windows, for every source. Rain counts from 0.2 mm in an hour (it was 0.5 mm in 3 hours).
+- All times are the track's own local time, not UTC. A track you add gets its time zone looked up once.
+- A tooltip only shows on the chart under the pointer; the others keep the vertical line.
+
+### Session dashboard
+
+- A session has a length. Its values are for the whole session: mean temperature and wind, total rain, and a count of the centres with a wet hour.
+- A verdict in words, and a grade for how far the forecasts agree, overall and for rain, temperature and wind.
+- A map of the forecast rain around the circuit in 15-minute steps, with play and a slider, and the rain radar of the last two hours next to it. The forecast map is one model (Open-Meteo best match), and says so.
+- The wind over the circuit: one arrow for all forecasts, one per centre, and headwind, tailwind or crosswind on each straight.
+- The overview's charts around the session, rain at the track in 15-minute steps, every centre as a dot on a line, and rain in the 3 hours before.
+
+### Weekend overview
+
+- The circuit's layout from its outline, with the pit straight, the driving direction and the lap length, in place of the rain radar.
+- Each session as a tile: temperature, how many expect rain, wind, and how far the forecasts agree. A tile opens its session.
+
+### Tracks and weekends
+
+- The track list folds away, and stays as you left it.
+- Weekend types: save a list of sessions under a name, reuse it on any track, and make one the default for every track.
+- Sessions have a length in minutes.
+- Outlines of the 16 built-in circuits come with the app. For a track you add, a button fetches the racetrack lines from OpenStreetMap once.
+
+### History and comparison
+
+- History has three views: the weekend's dates over the last 20 years, the last 14, 30 or 90 days, and any dates since 1940 by the hour.
+- Track comparison shows one row of charts per track on shared scales, and ranked bars for rain, rain days, temperature and wind.
+- Export to CSV: every hour of the days shown, for one track or for all compared tracks, in UTC and in the track's time.
+- Days are the track's own calendar days, with gusts and the prevailing wind direction.
+
+### The app
+
+- A new look: frosted panels over a glow that follows the weekend's weather, bundled fonts (Space Grotesk and Inter), motion that stops when the system asks for reduced motion.
+- `docs/METHOD.md` and `docs/DATA_SOURCES.md` cover the new parts. The Overpass API is used only on a button press: its operators discourage apps for the general public from relying on it.
+
 ## 3.0.0-preview.1 — Many sources, any track
 
 ### Forecasts

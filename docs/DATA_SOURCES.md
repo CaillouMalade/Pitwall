@@ -1,6 +1,6 @@
 # Data sources and their terms
 
-Every outside service Pitwall uses, what its terms say, and how the app follows them. The terms were read on 17 November 2026; each entry links to the pages that were read. This is a reading of public terms, not legal advice, and terms change: check them again before a release.
+Every outside service Pitwall uses, what its terms say, and how the app follows them. The terms were read on 17 November 2026 (the Overpass API on 18 November); each entry links to the pages that were read. This is a reading of public terms, not legal advice, and terms change: check them again before a release.
 
 **The conclusions below assume Pitwall stays free and unmonetised:** no price, no ads, no subscriptions, no in-app purchases and no income for its author. Several sources (Open-Meteo's free API, the satellite imagery, the rain radar) are free only on that condition. If Pitwall is ever sold or monetised, those have to be replaced or licensed first; the rows marked "non-commercial only" say which.
 
@@ -8,23 +8,25 @@ No source needs an account or a key, and nothing here costs money.
 
 ## Summary
 
-| Source                            | Used for                           | Use in a free public app                                                                                  | Licence                       |
-| --------------------------------- | ---------------------------------- | --------------------------------------------------------------------------------------------------------- | ----------------------------- |
-| Open-Meteo forecast API           | 12 weather models                  | Allowed. **Non-commercial only**                                                                          | CC BY 4.0                     |
-| MET Norway Locationforecast       | Forecast, worldwide                | Allowed, with **one point unconfirmed** (direct calls from a desktop app)                                 | NLOD 2.0 / CC BY 4.0          |
-| Bright Sky (DWD open data)        | DWD MOSMIX forecast                | Allowed                                                                                                   | CC BY 4.0                     |
-| US National Weather Service       | Forecast, United States            | Allowed                                                                                                   | Public domain                 |
-| SMHI                              | Forecast, Nordic countries         | Allowed, with **one point unconfirmed** (the API's documentation could not be read)                       | CC BY 4.0                     |
-| FMI                               | Forecast, northern Europe          | Allowed                                                                                                   | CC BY 4.0                     |
-| DMI                               | Forecast, north-west Europe        | Allowed                                                                                                   | CC BY 4.0                     |
-| GeoSphere Austria                 | Forecast, Alps, **off by default** | Allowed by its terms. **Not checked against a live answer**                                               | CC BY 4.0                     |
-| Open-Meteo Historical Weather API | History                            | Allowed. **Non-commercial only**                                                                          | CC BY 4.0                     |
-| OpenWeather (bundled log)         | History fallback                   | Allowed as read here, with **one point unconfirmed** (redistribution is not spelled out)                  | ODbL                          |
-| RainViewer                        | Rain radar                         | **Unconfirmed.** The terms say "personal and educational use"; a free public app is not mentioned         | Its own terms                 |
-| OpenStreetMap tiles               | Maps                               | Allowed under the tile usage policy                                                                       | ODbL                          |
-| Sentinel-2 cloudless by EOX       | Satellite view                     | Allowed. **Non-commercial only**                                                                          | CC BY-NC-SA 4.0               |
-| Esri World Imagery                | (removed)                          | **Not allowed without a paid ArcGIS subscription.** Pitwall 3.0.0-preview.0 used it; it is no longer used | Esri Master Licence Agreement |
-| Met Éireann                       | (not used)                         | Its licence adds a duty to show its weather warnings, which Pitwall does not do                           | CC BY 4.0 plus conditions     |
+| Source                            | Used for                                                          | Use in a free public app                                                                                  | Licence                       |
+| --------------------------------- | ----------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- | ----------------------------- |
+| Open-Meteo forecast API           | 12 weather models, the rain map of a session, a track's time zone | Allowed. **Non-commercial only**. The rain map uses many more calls than a forecast: see below            | CC BY 4.0                     |
+| MET Norway Locationforecast       | Forecast, worldwide                                               | Allowed, with **one point unconfirmed** (direct calls from a desktop app)                                 | NLOD 2.0 / CC BY 4.0          |
+| Bright Sky (DWD open data)        | DWD MOSMIX forecast                                               | Allowed                                                                                                   | CC BY 4.0                     |
+| US National Weather Service       | Forecast, United States                                           | Allowed                                                                                                   | Public domain                 |
+| SMHI                              | Forecast, Nordic countries                                        | Allowed, with **one point unconfirmed** (the API's documentation could not be read)                       | CC BY 4.0                     |
+| FMI                               | Forecast, northern Europe                                         | Allowed                                                                                                   | CC BY 4.0                     |
+| DMI                               | Forecast, north-west Europe                                       | Allowed                                                                                                   | CC BY 4.0                     |
+| GeoSphere Austria                 | Forecast, Alps, **off by default**                                | Allowed by its terms. **Not checked against a live answer**                                               | CC BY 4.0                     |
+| Open-Meteo Historical Weather API | History                                                           | Allowed. **Non-commercial only**                                                                          | CC BY 4.0                     |
+| OpenWeather (bundled log)         | History fallback                                                  | Allowed as read here, with **one point unconfirmed** (redistribution is not spelled out)                  | ODbL                          |
+| RainViewer                        | Rain radar                                                        | **Unconfirmed.** The terms say "personal and educational use"; a free public app is not mentioned         | Its own terms                 |
+| OpenStreetMap tiles               | Maps                                                              | Allowed under the tile usage policy                                                                       | ODbL                          |
+| OpenStreetMap data (bundled)      | The outline of the 16 built-in circuits                           | Allowed, with credit                                                                                      | ODbL                          |
+| Overpass API (overpass-api.de)    | The outline of a track the user adds, **only when the user asks** | **Discouraged by its operators for an app with many users.** One request per added track, on a button     | ODbL (the data)               |
+| Sentinel-2 cloudless by EOX       | Satellite view                                                    | Allowed. **Non-commercial only**                                                                          | CC BY-NC-SA 4.0               |
+| Esri World Imagery                | (removed)                                                         | **Not allowed without a paid ArcGIS subscription.** Pitwall 3.0.0-preview.0 used it; it is no longer used | Esri Master Licence Agreement |
+| Met Éireann                       | (not used)                                                        | Its licence adds a duty to show its weather warnings, which Pitwall does not do                           | CC BY 4.0 plus conditions     |
 
 ## What the app does for every service
 
@@ -110,6 +112,13 @@ Each user's computer calls the services directly, so rate limits that count per 
 - **Limits:** "5 requests per second and 240 requests per hour". No key.
 - **Why it is off:** the data address answered with a server error every time it was tried on 17 November 2026, so the adapter was written from the documentation and the dataset's metadata, and has **not been checked against a live answer**. It can be turned on in Settings. Once an answer has been checked, remove it from `PROVIDERS_OFF_BY_DEFAULT` in `web/src/lib/sources.ts`.
 
+### The rain map of a session, and a track's time zone (Open-Meteo)
+
+Two more uses of the same Open-Meteo forecast API, under the same terms as above.
+
+- **The rain map** on the Session dashboard asks for rain in 15-minute steps at 49 points (a grid of 7 by 7, 8 km apart) in one request, for the session with an hour on either side. Open-Meteo counts a request for several places as several calls, so one map is about 49 calls where a forecast is about 5. It is kept for 30 minutes per session and track, and not asked for a session that is over. Opening every session of 4 tracks in a day is about 1,000 of the 10,000 calls a day.
+- **The time zone** of a track the user adds is read from one small request (`timezone=auto`), once per track.
+
 ## History
 
 ### Open-Meteo Historical Weather API
@@ -130,7 +139,23 @@ Each user's computer calls the services directly, so rate limits that count per 
 - **Unconfirmed:** the pages do not say in so many words that stored data may be redistributed inside an app. The nearest passage is that a database built from the data and "distributed externally … must be offered under the same ODbL license". The bundled file is therefore offered under ODbL 1.0. To be safe without it, delete the file: History then needs a connection.
 - Pitwall does not call OpenWeather.
 
+History now makes more requests than before: "These dates" asks for one week in each of 20 years, as 20 small requests (about 20 calls, kept on the device afterwards), and an hourly export asks for up to 92 days of hours per track.
+
 ## Radar and maps
+
+### OpenStreetMap data: the circuit outlines
+
+- **Bundled:** `web/src/data/track-outlines.json` holds the racing line of each of the 16 built-in circuits, built by `scripts/track-outlines.mjs` from OpenStreetMap ways tagged `highway=raceway`. © OpenStreetMap contributors, under the [Open Database License](https://www.openstreetmap.org/copyright); the file is offered under the same licence. The app never downloads these.
+- **Credit:** the About screen and `THIRD_PARTY.md` name OpenStreetMap for the outlines.
+
+### Overpass API (discouraged for apps; used only on request)
+
+- **Read:** [Overpass API manual, "Commons"](https://dev.overpass-api.de/overpass-doc/en/preface/commons.html) and the [OpenStreetMap wiki page](https://wiki.openstreetmap.org/wiki/Overpass_API).
+- **Limits:** "users are expected to send a maximum of about 10000 requests per day" and "keep their download volume below about 1 GB per day". For an app, "the usage counts towards the sum of requests made by all your users". A refused request is answered with status 429.
+- **Use in a public app:** the manual lists "Setting up an app for more than just OSM mappers and relying on the public instances as backend" as problematic behaviour, and says "only running your own instance sustainably serves your mission". The wiki says "Cache and rate-limit calls".
+- **What Pitwall does:** it never calls Overpass on its own. A track the user added shows a button, "Get the outline from OpenStreetMap"; pressing it sends one request with the track's coordinates, and the answer is kept on the device and never asked again. The built-in circuits never ask.
+- **Flag:** this is the smallest use there is, but it is still an app for the general public using the public instance, which its operators discourage. If Pitwall gets many users, remove the button or point it at an Overpass server of your own. Asking the operators is free.
+- **User-Agent:** the wiki asks apps to send a `User-Agent` or `Referer` that identifies them; the desktop app sends its User-Agent.
 
 ### RainViewer (unconfirmed)
 

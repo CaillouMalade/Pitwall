@@ -4,7 +4,8 @@ Pitwall collects nothing about you. There is no account, no analytics, no crash 
 
 ## What stays on your computer
 
-- The tracks you add (name and coordinates) and each track's weekend.
+- The tracks you add (name and coordinates), each track's weekend and the weekend types you save.
+- The outline of a track you added, once you asked for it, and the past weather of the dates you looked at.
 - Your settings: units, appearance, which forecast services are on, which circuit view you last used.
 - The last forecast of the few tracks you opened most recently, so the app has something to show without a connection.
 - On the desktop app, the size and position of the window.
@@ -19,11 +20,15 @@ To show weather for a track, Pitwall asks public weather and map services direct
 - **Your IP address**, as with any internet request. The services see it; Pitwall never does.
 - **A User-Agent naming the app and its version** ("Pitwall/3.0.0 (+https://github.com/Arthur-Brht/pitwall)"), because several services require apps to identify themselves. It identifies the app, not you.
 
+For a track you added, pressing "Get the outline from OpenStreetMap" sends its coordinates once to OpenStreetMap's Overpass service; without that press, nothing is sent there.
+
+Exporting a CSV file writes it to the folder you choose. It is not sent anywhere.
+
 Nothing else is sent: no name, no identifier for you or your computer, no list of your tracks, no usage data. A service is only asked when you open a track or press Refresh, and a service that does not cover a track's region is not asked at all.
 
 ## The services
 
-Open-Meteo, MET Norway, Bright Sky (for the German weather service's data), the US National Weather Service, SMHI (Sweden), FMI (Finland), DMI (Denmark), GeoSphere Austria (only if you turn it on), RainViewer, OpenStreetMap and EOX. Each keeps its own server logs under its own privacy policy. Two say how in the terms Pitwall read: MET Norway stores the IP address of direct requests in its logs, and DMI logs the IP address, the request and the time for up to 60 months.
+Open-Meteo, MET Norway, Bright Sky (for the German weather service's data), the US National Weather Service, SMHI (Sweden), FMI (Finland), DMI (Denmark), GeoSphere Austria (only if you turn it on), RainViewer, OpenStreetMap (map tiles, and the Overpass service when you ask for an outline) and EOX. Each keeps its own server logs under its own privacy policy. Two say how in the terms Pitwall read: MET Norway stores the IP address of direct requests in its logs, and DMI logs the IP address, the request and the time for up to 60 months.
 
 You can turn any forecast service off in Settings. With no connection, Pitwall sends nothing.
 
