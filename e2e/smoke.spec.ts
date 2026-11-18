@@ -211,7 +211,7 @@ test("session dashboard: verdict, maps, charts, then each source", async ({
   await page.getByRole("button", { name: "Pause" }).click();
 
   // Radar is what was measured: the last two hours, with its own slider.
-  await rain.getByRole("radio", { name: "Radar" }).click();
+  await rain.getByRole("radio", { name: "Past & current" }).click();
   await expect(
     rain.getByRole("img", { name: "Rain radar around Red Bull Ring" }),
   ).toBeVisible();
@@ -371,7 +371,7 @@ test("a track anywhere: add, keep, edit and delete", async ({
   );
   // Its time zone is looked up.
   await expect(
-    page.getByRole("heading", { name: /^Sessions GMT-5/ }),
+    page.getByRole("heading", { name: /^Sessions local time · GMT-5/ }),
   ).toBeVisible();
   // Its outline comes from OpenStreetMap, but only when asked for.
   const outline = page.getByRole("region", { name: "Circuit" });

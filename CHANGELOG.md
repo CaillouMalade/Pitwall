@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- The frosted panels are now really frosted in the desktop app: the blur was dropped when the app was built. The page bar and the timeline get a frosted back once the page scrolls under them.
+- The rain map opens closer in, with a ring around the circuit. Its switch reads "Forecast" and "Past & current", and the radar slider shows the time it is on.
+- In "How far the forecasts are apart", dots that would cover each other are stacked.
+- The session list says its times are local time.
+
 ## 3.0.0-preview.2 — By the hour, by the session
 
 ### Forecasts

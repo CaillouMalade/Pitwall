@@ -179,7 +179,8 @@ export function Sidebar({
       <section aria-labelledby="sessions-heading" className="side-section">
         <div className="side-row">
           <h2 id="sessions-heading" className="side-heading">
-            Sessions <span className="muted">{zoneName(now, zone)}</span>
+            Sessions{" "}
+            <span className="muted">local time · {zoneName(now, zone)}</span>
           </h2>
           <div className="side-actions">
             <button

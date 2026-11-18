@@ -1,3 +1,4 @@
+import { LANE_PX, swarm } from "../lib/swarm.ts";
 import { useEffect, useMemo, useState } from "react";
 import { ArrowUp, ChevronLeft, ChevronRight, Pause, Play } from "lucide-react";
 import {
@@ -638,6 +639,7 @@ function Spread({
   const x = (value: number) => ((value - low) / (high - low)) * 100;
   const middle = estimate.value === null ? null : convert(estimate.value);
   const sorted = [...present].sort((a, b) => a.value - b.value);
+  const placed = swarm(sorted.map((item) => x(item.value)));
   return (
     <div className={`spread ${tone}`}>
       <div className="spread-head">
@@ -664,11 +666,14 @@ function Spread({
         {middle !== null && (
           <span className="spread-median" style={{ left: `${x(middle)}%` }} />
         )}
-        {sorted.map((item) => (
+        {sorted.map((item, i) => (
           <span
             key={item.name}
             className="spread-dot"
-            style={{ left: `${x(item.value)}%` }}
+            style={{
+              left: `${placed[i].x}%`,
+              marginTop: `${placed[i].lane * LANE_PX - 4.5}px`,
+            }}
             title={`${item.name}: ${show(item.value)} ${unit}`}
           />
         ))}

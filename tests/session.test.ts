@@ -569,3 +569,28 @@ test("an outline that cannot be fetched or read", async () => {
     [],
   );
 });
+
+test("dots that would cover each other are stacked, then moved aside", async () => {
+  const { swarm } = await import("../web/src/lib/swarm.ts");
+  // Apart: all on the middle row.
+  assert.deepEqual(
+    swarm([0, 10, 20]).map((dot) => dot.lane),
+    [0, 0, 0],
+  );
+  // Six on one value: five rows, then the sixth one gap to the right.
+  const bunch = swarm([50, 50, 50, 50, 50, 50]);
+  assert.deepEqual(
+    bunch.map((dot) => dot.lane),
+    [0, -1, 1, -2, 2, 0],
+  );
+  assert.deepEqual(
+    bunch.map((dot) => dot.x),
+    [50, 50, 50, 50, 50, 53.4],
+  );
+  // No two dots of a row are closer than the gap.
+  const many = swarm([0, 1, 1, 2, 2, 2, 3, 3, 4, 4, 5, 9, 9, 30]);
+  for (const a of many)
+    for (const b of many)
+      if (a !== b && a.lane === b.lane)
+        assert.ok(Math.abs(a.x - b.x) >= 3.4 - 1e-9);
+});

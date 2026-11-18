@@ -89,6 +89,14 @@ export default function App() {
     [plans, track.id, defaultType],
   );
   const zone = trackZone(track);
+  // The page bar gets a frosted back once the page moves under it.
+  const [scrolled, setScrolled] = useState(false);
+  useEffect(() => {
+    const read = () => setScrolled(window.scrollY > 4);
+    read();
+    window.addEventListener("scroll", read, { passive: true });
+    return () => window.removeEventListener("scroll", read);
+  }, []);
   const [page, setPage] = useState<PageId>("overview");
   const [sessionIndex, setSessionIndex] = useState(0);
   const [period, setPeriod] = useState<HistoryPeriod>(30);
@@ -217,7 +225,7 @@ export default function App() {
         onAbout={() => setDialog("about")}
       />
       <main className="main" id="content">
-        <nav className="tabs" aria-label="Pages">
+        <nav className={scrolled ? "tabs scrolled" : "tabs"} aria-label="Pages">
           {PAGES.map((item) => (
             <button
               key={item.id}

@@ -38,6 +38,7 @@ function useMap(
   setup: (map: L.Map) => void,
   shape: TrackShape | null,
   marker = true,
+  highlight = false,
 ): [React.RefObject<HTMLDivElement | null>, L.Map | null] {
   const element = useRef<HTMLDivElement>(null);
   const [map, setMap] = useState<L.Map | null>(null);
@@ -72,6 +73,32 @@ function useMap(
       const lines = shape.lines.map((line) =>
         line.map(([lat, lon]) => [lat, lon] as [number, number]),
       );
+      if (highlight) {
+        // A ring around the circuit, so it is found at any zoom.
+        const bounds = L.latLngBounds(lines.flat());
+        const centre = bounds.getCenter();
+        const radius =
+          Math.max(...lines.flat().map((point) => centre.distanceTo(point))) +
+          350;
+        layers.push(
+          L.circle(centre, {
+            radius,
+            color: "#ff3b5c",
+            weight: 1.5,
+            opacity: 0.9,
+            dashArray: "5 6",
+            fillColor: "#ff3b5c",
+            fillOpacity: 0.07,
+            interactive: false,
+          }),
+          L.polyline(lines, {
+            color: "#ff3b5c",
+            weight: 13,
+            opacity: 0.28,
+            interactive: false,
+          }),
+        );
+      }
       layers.push(
         L.polyline(lines, {
           color: "#ffffff",
@@ -100,7 +127,15 @@ function useMap(
     return () => {
       for (const layer of layers) layer.remove();
     };
-  }, [map, shape, marker, track.latitude, track.longitude, track.name]);
+  }, [
+    map,
+    shape,
+    marker,
+    highlight,
+    track.latitude,
+    track.longitude,
+    track.name,
+  ]);
 
   return [element, map];
 }
@@ -207,7 +242,7 @@ export type RainMode = "forecast" | "radar";
 
 const MODES = [
   { value: "forecast", label: "Forecast" },
-  { value: "radar", label: "Radar" },
+  { value: "radar", label: "Past & current" },
 ] as const;
 
 function RainLegend() {
@@ -234,8 +269,8 @@ function RainLegend() {
 
 /**
  * Rain around the circuit. "Forecast" is one model's rain for the session, moved
- * by the page's timeline; "Radar" is what was measured in the last two hours,
- * with its own slider.
+ * by the page's timeline; "Past & current" is the radar: what was measured in
+ * the last two hours, with its own slider.
  */
 export function RainMap({
   track,
@@ -258,7 +293,8 @@ export function RainMap({
   const shape = useTrackShape(track);
   const [element, map] = useMap(
     track,
-    10,
+    // Close enough to see the circuit; the forecast reaches 24 km around it.
+    12,
     (created) => {
       L.tileLayer(STREETS, {
         maxZoom: 14,
@@ -269,6 +305,8 @@ export function RainMap({
       created.setMaxZoom(14).setMinZoom(5);
     },
     shape,
+    true,
+    true,
   );
 
   // Forecast: one picture per 15 minutes, drawn the first time it is shown.
@@ -398,6 +436,7 @@ export function RainMap({
           <span className="muted">
             {formatClock(frames.at(-1)!.time, zone)}
           </span>
+          <output className="radar-now">{formatClock(frame.time, zone)}</output>
         </div>
       )}
       <div className="map-foot">
