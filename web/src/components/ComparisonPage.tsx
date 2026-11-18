@@ -1,5 +1,6 @@
 import { AlertTriangle, Check } from "lucide-react";
-import { formatIsoDay, formatValue } from "../lib/format.ts";
+import { csvName, hourlyCsv } from "../lib/csv.ts";
+import { formatIsoWeekday } from "../lib/format.ts";
 import type { HistoryPeriod } from "../lib/history-source.ts";
 import {
   MIN_DAYS,
@@ -11,15 +12,16 @@ import {
 } from "../lib/history.ts";
 import { useFormat } from "../lib/settings.tsx";
 import type { Track } from "../lib/types.ts";
-import { useHistories } from "../lib/use-data.ts";
+import { loadHours, useHistories } from "../lib/use-data.ts";
+import { addDays, localDay, trackZone } from "../lib/zone.ts";
+import { ChartGroup } from "./ForecastCharts.tsx";
+import { DailyCharts, RankBars, SERIES } from "./HistoryCharts.tsx";
 import {
-  DailyBars,
-  DailyLines,
-  SERIES,
-  type Datum,
-  type Series,
-} from "./HistoryCharts.tsx";
-import { BUNDLED_NOTICE, HistoryCredit, PeriodSwitch } from "./HistoryPage.tsx";
+  BUNDLED_NOTICE,
+  ExportButton,
+  HistoryCredit,
+  PeriodSwitch,
+} from "./HistoryPage.tsx";
 import { Card, Empty, Loading, Notice, PageHeader } from "./ui.tsx";
 
 export const MAX_COMPARED = 4;
@@ -49,6 +51,7 @@ interface Props {
   onChosen: (chosen: Choice[]) => void;
   period: HistoryPeriod;
   onPeriod: (period: HistoryPeriod) => void;
+  now: number;
 }
 
 export function ComparisonPage({
@@ -57,6 +60,7 @@ export function ComparisonPage({
   onChosen,
   period,
   onPeriod,
+  now,
 }: Props) {
   const toggle = (track: Track) => {
     if (chosen.some((choice) => choice.id === track.id))
@@ -70,7 +74,11 @@ export function ComparisonPage({
 
   return (
     <>
-      <PageHeader title="Track comparison" subtitle="Past weather, same days">
+      <PageHeader
+        eyebrow="Track comparison"
+        title="Past weather, same days"
+        subtitle={`Pick 2 to ${MAX_COMPARED} tracks`}
+      >
         <PeriodSwitch period={period} onPeriod={onPeriod} />
       </PageHeader>
       <div
@@ -107,7 +115,12 @@ export function ComparisonPage({
       {chosen.length < 2 ? (
         <Empty>Pick at least two tracks to compare.</Empty>
       ) : (
-        <ComparisonResults tracks={tracks} chosen={chosen} period={period} />
+        <ComparisonResults
+          tracks={tracks}
+          chosen={chosen}
+          period={period}
+          now={now}
+        />
       )}
     </>
   );
@@ -117,10 +130,12 @@ function ComparisonResults({
   tracks,
   chosen,
   period,
+  now,
 }: {
   tracks: readonly Track[];
   chosen: Choice[];
   period: HistoryPeriod;
+  now: number;
 }) {
   const format = useFormat();
   const picked = chosen
@@ -179,100 +194,141 @@ function ComparisonResults({
       summarise(history.trackId, name(history.trackId), onDays(history, days)),
     ),
   );
-  const ids = summaries.map((summary) => summary.trackId);
-
-  // One row per day, with each track's values under its own keys.
-  const rows = new Map<string, Datum>(days.map((day) => [day, { day }]));
-  for (const history of histories)
-    for (const day of onDays(history, days)) {
-      const row = rows.get(day.day)!;
-      row[`${history.trackId}:rain`] = day.rain;
-      row[`${history.trackId}:range`] =
-        day.temperatureMin === null || day.temperatureMax === null
-          ? null
-          : [
-              format.toTemperature(day.temperatureMin),
-              format.toTemperature(day.temperatureMax),
-            ];
-      row[`${history.trackId}:swing`] =
-        day.temperatureRange === null
-          ? null
-          : format.toTemperatureDifference(day.temperatureRange);
-    }
-  const data = [...rows.values()];
-  const series = (suffix: string): Series[] =>
-    ids.map((id) => ({
-      key: `${id}:${suffix}`,
-      label: name(id),
-      color: color(id),
+  const perTrack = summaries.map((summary) => ({
+    summary,
+    color: color(summary.trackId),
+    days: onDays(
+      histories.find((history) => history.trackId === summary.trackId)!,
+      days,
+    ),
+  }));
+  // One rain scale for every track, so the bars can be compared by eye.
+  const rainMax = Math.max(
+    2,
+    ...perTrack.flatMap((item) => item.days.map((day) => day.rain ?? 0)),
+  );
+  const temperatures = perTrack.flatMap((item) =>
+    item.days.flatMap((day) =>
+      [day.temperatureMin, day.temperatureMax].filter(
+        (value): value is number => value !== null,
+      ),
+    ),
+  );
+  const bars = (value: (item: (typeof perTrack)[number]) => number | null) =>
+    perTrack.map((item) => ({
+      name: item.summary.track,
+      color: item.color,
+      value: value(item),
     }));
-  const span = `${formatIsoDay(days[0])} – ${formatIsoDay(days.at(-1)!)}`;
-  const names = ids.map(name).join(", ");
+  const span = `${formatIsoWeekday(days[0])} to ${formatIsoWeekday(days.at(-1)!)}`;
 
   return (
     <>
       {bundled && <Notice>{BUNDLED_NOTICE}</Notice>}
       {without}
-      <div className="summary-grid" aria-label="Wettest to driest">
-        {summaries.map((summary, rank) => (
-          <Card key={summary.trackId} className="summary-card">
-            <div className="summary-head">
-              <i
-                style={{ background: color(summary.trackId) }}
-                aria-hidden="true"
-              />
-              <h2>{summary.track}</h2>
-              <span className="rank">{rank + 1}</span>
-            </div>
-            <dl className="summary-values">
-              <div>
-                <dt>Total rain</dt>
-                <dd>{formatValue(summary.totalRain, "mm")}</dd>
-              </div>
-              <div>
-                <dt>Rain days</dt>
-                <dd>{summary.rainDays}</dd>
-              </div>
-              <div>
-                <dt>Average temperature</dt>
-                <dd>{format.temperature(summary.averageTemperature)}</dd>
-              </div>
-              <div>
-                <dt>Days</dt>
-                <dd>{summary.days}</dd>
-              </div>
-            </dl>
-          </Card>
-        ))}
-      </div>
-      <p className="muted period">{span}, wettest first</p>
-      <Card title="Daily rain, mm">
-        <DailyLines
-          data={data}
-          series={series("rain")}
-          unit="mm"
-          floorZero
-          label={`Daily rain at ${names}, ${span}.`}
-        />
-      </Card>
       <Card
-        title={`Daily lowest to highest temperature, ${format.temperatureUnit}`}
+        title={span}
+        aside={
+          !bundled && (
+            <ExportButton
+              label="Export hourly CSV"
+              title="Every hour of these days, for each track"
+              make={async () => {
+                const kept = picked.filter((track) =>
+                  histories.some((history) => history.trackId === track.id),
+                );
+                const all = await Promise.all(
+                  kept.map(async (track) => {
+                    const zone = trackZone(track);
+                    const today = localDay(now, zone);
+                    return {
+                      track: track.name,
+                      zone,
+                      hours: await loadHours(
+                        track,
+                        addDays(today, -period),
+                        addDays(today, -1),
+                      ),
+                    };
+                  }),
+                );
+                return {
+                  name: csvName(
+                    kept.map((track) => track.name).join(" "),
+                    days[0],
+                    days.at(-1)!,
+                    "hourly",
+                  ),
+                  text: hourlyCsv(all, format),
+                };
+              }}
+            />
+          )
+        }
       >
-        <DailyBars
-          data={data}
-          series={series("range")}
-          unit={format.temperatureUnit}
-          label={`Daily temperature range at ${names}, ${span}.`}
-        />
+        <div className="rank-grid">
+          <RankBars
+            title="Total rain"
+            unit="mm"
+            items={bars((item) => item.summary.totalRain)}
+          />
+          <RankBars
+            title="Rain days"
+            unit="days"
+            digits={0}
+            items={bars((item) => item.summary.rainDays)}
+          />
+          <RankBars
+            title="Average temperature"
+            unit={format.temperatureUnit}
+            items={bars((item) =>
+              item.summary.averageTemperature === null
+                ? null
+                : format.toTemperature(item.summary.averageTemperature),
+            )}
+          />
+          <RankBars
+            title="Strongest wind"
+            unit={format.windUnit}
+            digits={format.windDigits}
+            items={bars((item) =>
+              item.summary.strongestWind === null
+                ? null
+                : format.toWind(item.summary.strongestWind),
+            )}
+          />
+        </div>
       </Card>
-      <Card title={`Daily swing, highest − lowest, ${format.temperatureUnit}`}>
-        <DailyBars
-          data={data}
-          series={series("swing")}
-          unit={format.temperatureUnit}
-          label={`Daily temperature swing at ${names}, ${span}.`}
-        />
-      </Card>
+      <ChartGroup>
+        <Card
+          title="Day by day"
+          aside={
+            <span className="muted">
+              Rain in mm on one scale, then low to high temperature in{" "}
+              {format.temperatureUnit}; wettest track first
+            </span>
+          }
+        >
+          <div className="multiples">
+            {perTrack.map((item) => (
+              <section key={item.summary.trackId} className="multiple">
+                <h3>
+                  <i style={{ background: item.color }} aria-hidden="true" />
+                  {item.summary.track}
+                </h3>
+                <DailyCharts
+                  days={item.days}
+                  sync="comparison"
+                  rainMax={rainMax}
+                  temperatures={temperatures}
+                  color={item.color}
+                  compact
+                />
+              </section>
+            ))}
+          </div>
+        </Card>
+      </ChartGroup>
       <HistoryCredit origin={bundled ? "bundled" : "archive"} />
     </>
   );

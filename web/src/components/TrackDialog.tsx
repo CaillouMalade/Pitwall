@@ -37,7 +37,20 @@ export function TrackDialog({
     event.preventDefault();
     try {
       const input = checkTrack(name, latitude, longitude, tracks, editing?.id);
-      onSave(editing ? { ...editing, ...input } : createTrack(input, tracks));
+      // A track that moved gets its time zone looked up again.
+      const moved =
+        !!editing &&
+        (editing.latitude !== input.latitude ||
+          editing.longitude !== input.longitude);
+      onSave(
+        editing
+          ? {
+              ...editing,
+              ...input,
+              timezone: moved ? undefined : editing.timezone,
+            }
+          : createTrack(input, tracks),
+      );
     } catch (problem) {
       setError(
         problem instanceof TrackInputError

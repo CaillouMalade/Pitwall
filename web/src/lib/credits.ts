@@ -72,7 +72,7 @@ export const CREDITS: readonly Credit[] = [
   {
     name: "OpenStreetMap",
     url: "https://www.openstreetmap.org/copyright",
-    detail: "Maps © OpenStreetMap contributors. ODbL",
+    detail: "Maps and circuit outlines © OpenStreetMap contributors. ODbL",
   },
   {
     name: "Sentinel-2 cloudless by EOX",

@@ -37,7 +37,7 @@ export function AboutDialog({ onClose }: { onClose: () => void }) {
             ))}
           </ul>
           <p className="muted">
-            Forecasts are converted, cut into 3-hour windows and combined by
+            Forecasts are converted, cut into hourly steps and combined by
             Pitwall. No weather service endorses it.
           </p>
         </section>

@@ -1,19 +1,25 @@
 import { useEffect, useId, useRef, type ReactNode } from "react";
 import { AlertTriangle, CloudOff, RotateCw, X } from "lucide-react";
 import { formatClock, formatDayTime } from "../lib/format.ts";
+import type { Confidence } from "../lib/stats.ts";
+import { localDay } from "../lib/zone.ts";
 
 export function PageHeader({
   title,
+  eyebrow,
   subtitle,
   children,
 }: {
   title: string;
+  /** A short line above the title, like the page's name. */
+  eyebrow?: string;
   subtitle?: ReactNode;
   children?: ReactNode;
 }) {
   return (
     <header className="page-header">
       <div className="page-title">
+        {eyebrow && <p className="eyebrow">{eyebrow}</p>}
         <h1>{title}</h1>
         {subtitle && <p className="subtitle">{subtitle}</p>}
       </div>
@@ -27,14 +33,17 @@ export function Card({
   aside,
   children,
   className,
+  label,
 }: {
   title?: string;
   aside?: ReactNode;
   children: ReactNode;
   className?: string;
+  /** A name for screen readers, for a card without a title. */
+  label?: string;
 }) {
   return (
-    <section className={`card ${className ?? ""}`} aria-label={title}>
+    <section className={`card ${className ?? ""}`} aria-label={title ?? label}>
       {(title || aside) && (
         <div className="card-head">
           {title && <h2>{title}</h2>}
@@ -100,21 +109,26 @@ export function RefreshButton({
   fetchedAt,
   onRefresh,
   busy,
+  zone = "UTC",
 }: {
   fetchedAt?: number;
   onRefresh: () => void;
   busy?: boolean;
+  /** The time zone the time is shown in: the track's. */
+  zone?: string;
 }) {
   // A forecast from another day says so: "Mon 16 Nov, 21:40" instead of "21:40".
   const sameDay =
     fetchedAt !== undefined &&
-    Math.floor(fetchedAt / 86_400_000) === Math.floor(Date.now() / 86_400_000);
+    localDay(fetchedAt, zone) === localDay(Date.now(), zone);
   return (
     <>
       {fetchedAt !== undefined && (
         <span className="muted">
-          Updated {sameDay ? formatClock(fetchedAt) : formatDayTime(fetchedAt)}{" "}
-          UTC
+          Updated{" "}
+          {sameDay
+            ? formatClock(fetchedAt, zone)
+            : formatDayTime(fetchedAt, zone)}
         </span>
       )}
       <button
@@ -131,20 +145,52 @@ export function RefreshButton({
   );
 }
 
+const CONFIDENCE_TEXT: Record<Confidence, string> = {
+  high: "Forecasts agree",
+  medium: "Some spread",
+  low: "Forecasts disagree",
+  unknown: "Too few forecasts",
+};
+
+/** How far the forecasts are apart, as a coloured label. */
+export function ConfidenceBadge({
+  level,
+  short,
+}: {
+  level: Confidence;
+  short?: boolean;
+}) {
+  return (
+    <span className={`confidence ${level}`}>
+      <i aria-hidden="true" />
+      {short ? (level === "unknown" ? "n/a" : level) : CONFIDENCE_TEXT[level]}
+    </span>
+  );
+}
+
 export function Stat({
   label,
   value,
   detail,
+  tone,
+  aside,
   children,
 }: {
   label: string;
   value: ReactNode;
   detail?: ReactNode;
+  /** Which of the weather colours the tile takes. */
+  tone?: "temp" | "rain" | "wind";
+  /** Something small next to the label, like a confidence badge. */
+  aside?: ReactNode;
   children?: ReactNode;
 }) {
   return (
-    <div className="stat">
-      <span className="stat-label">{label}</span>
+    <div className={`stat ${tone ?? ""}`}>
+      <span className="stat-label">
+        {label}
+        {aside}
+      </span>
       <span className="stat-value">
         {children}
         {value}
