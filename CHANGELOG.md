@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 3.0.0-preview.3 — Frosted for real
 
 - The frosted panels are now really frosted in the desktop app: the blur was dropped when the app was built. The page bar and the timeline get a frosted back once the page scrolls under them.
 - The rain map opens closer in, with a ring around the circuit. Its switch reads "Forecast" and "Past & current", and the radar slider shows the time it is on.
