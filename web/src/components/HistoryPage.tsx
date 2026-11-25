@@ -77,7 +77,7 @@ export function HistoryCredit({ origin }: { origin: HistoryOrigin }) {
   return (
     <p className="muted credit">
       {origin === "archive"
-        ? "ERA5 and ECMWF IFS reanalysis from Open-Meteo: a model's reconstruction on a grid of a few kilometres, not a gauge at the track. Local showers can be missed. Days are the track's own calendar days."
+        ? "Reanalysis from Open-Meteo: a model's estimate, not a gauge at the track."
         : "Weather logged at the track from 29 October to 13 November 2026. Weather data © OpenWeather."}
     </p>
   );
@@ -201,7 +201,7 @@ const share = (value: number | null) =>
 /** The colour of a day's rain, from nothing to a soaking. */
 function rainShade(rain: number | null): React.CSSProperties {
   if (rain === null) return { background: "var(--hover)" };
-  if (rain < 0.1) return { background: "var(--dry)" };
+  if (rain < 0.1) return { background: "var(--surface-2)" };
   // 0.1 mm is faint, 20 mm and more is full.
   const strength = Math.min(1, Math.log10(rain * 10) / Math.log10(200));
   return {
@@ -344,11 +344,12 @@ function SameDates({
             detail={`Mostly ${spread(normal.wind, format.windNumber)} ${format.windUnit}`}
           />
         </div>
-        <p className="card-foot muted">
-          "Mostly" is the middle 80% of the days.
-          {normal.wettest &&
-            ` Wettest day: ${formatValue(normal.wettest.rain, "mm")} on ${formatIsoDate(normal.wettest.day)}.`}
-        </p>
+        {normal.wettest && (
+          <p className="card-foot muted">
+            Wettest day: {formatValue(normal.wettest.rain, "mm")} on{" "}
+            {formatIsoDate(normal.wettest.day)}
+          </p>
+        )}
       </Card>
 
       <Card
@@ -446,10 +447,6 @@ function SameDates({
             </tbody>
           </table>
         </div>
-        <p className="card-foot muted">
-          Rain per day in mm; the three marked columns are the weekend. High and
-          wind are the highest of those three days.
-        </p>
       </Card>
       <HistoryCredit origin="archive" />
     </>
@@ -710,14 +707,7 @@ function Range({
           />
         </Card>
       ) : (
-        <Card
-          title="Day by day"
-          aside={
-            <span className="muted">
-              Ranges of 10 days or less show every hour; the CSV always has them
-            </span>
-          }
-        >
+        <Card title="Day by day">
           <DailyCharts days={days} sync="range" />
         </Card>
       )}

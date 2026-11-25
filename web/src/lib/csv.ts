@@ -1,5 +1,6 @@
 // Past weather as CSV, to line up with a team's own data from a weekend.
 
+import { isNativeApp, shareFile } from "./native.ts";
 import type { UnitFormat } from "./format.ts";
 import type { DailyWeather, HourlyWeather } from "./history.ts";
 import { zoneOffset } from "./zone.ts";
@@ -155,6 +156,10 @@ export function csvName(
 
 /** Hand a text to the browser as a file to save. */
 export function download(name: string, text: string): void {
+  if (isNativeApp()) {
+    void shareFile(name, text);
+    return;
+  }
   const url = URL.createObjectURL(
     new Blob([text], { type: "text/csv;charset=utf-8" }),
   );

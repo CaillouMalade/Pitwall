@@ -4,6 +4,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
+  agreementText,
   rainText,
   rangeText,
   sessionMessage,
@@ -150,7 +151,7 @@ test("range text: a range from three centres, both values with two", () => {
   const [first] = combineForecasts(fakeTable());
   assert.equal(
     rangeText(first.temperature, "°C", metric.temperatureNumber),
-    "80% range: 9.0 to 9.8 °C",
+    "Range 9.0 to 9.8 °C",
   );
   const [two] = combineForecasts(fakeTable().slice(0, 16));
   assert.equal(
@@ -174,12 +175,12 @@ test("range text in the chosen units", () => {
   // 9 to 9.8 °C is 48.2 to 49.6 °F.
   assert.equal(
     rangeText(first.temperature, "°F", imperial.temperatureNumber),
-    "80% range: 48.2 to 49.6 °F",
+    "Range 48.2 to 49.6 °F",
   );
   // 3.2 to 4 m/s is 7 to 9 mph.
   assert.equal(
     rangeText(first.wind, "mph", imperial.windNumber),
-    "80% range: 7 to 9 mph",
+    "Range 7 to 9 mph",
   );
 });
 
@@ -231,4 +232,38 @@ test("axis ticks are round, even and hold both ends", () => {
   assert.deepEqual(niceTicks(0, 11.6, 3), [0, 5, 10, 15]);
   assert.deepEqual(niceTicks(-3.5, 4), [-4, -2, 0, 2, 4]);
   assert.deepEqual(niceTicks(5, 5), [5]);
+});
+
+test("agreement text names what the forecasts are apart on", () => {
+  const grades = (
+    rain: "high" | "medium" | "low" | "unknown",
+    temperature: typeof rain,
+    wind: typeof rain,
+    overall: typeof rain,
+  ) => ({ rain, temperature, wind, overall });
+  assert.equal(
+    agreementText(grades("high", "high", "high", "high")),
+    "Forecasts agree",
+  );
+  // A dry session with a wide temperature range is not a doubtful rain forecast.
+  assert.equal(
+    agreementText(grades("high", "low", "high", "low")),
+    "Forecasts disagree on temperature",
+  );
+  assert.equal(
+    agreementText(grades("low", "medium", "low", "low")),
+    "Forecasts disagree on rain and wind",
+  );
+  assert.equal(
+    agreementText(grades("high", "medium", "unknown", "medium")),
+    "Some spread in temperature",
+  );
+  assert.equal(
+    agreementText(grades("low", "low", "low", "low")),
+    "Forecasts disagree",
+  );
+  assert.equal(
+    agreementText(grades("unknown", "unknown", "unknown", "unknown")),
+    "Too few forecasts",
+  );
 });

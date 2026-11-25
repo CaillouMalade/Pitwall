@@ -2,6 +2,7 @@
 // ForecastPoints on the same 3-hour UTC windows.
 
 import type { FetchLike } from "../http.ts";
+import { isNativeApp } from "../native.ts";
 import type { ProviderId } from "../sources.ts";
 import type { ForecastPoint } from "../types.ts";
 import { brightSky } from "./bright-sky.ts";
@@ -39,12 +40,21 @@ export const PROVIDERS: Record<
 
 export const PROVIDER_IDS = Object.keys(PROVIDERS) as ProviderId[];
 
+// MET Norway's terms ask mobile apps not to call its API directly but through
+// a server of their own, and Pitwall has none; see docs/DATA_SOURCES.md.
+const NOT_IN_MOBILE_APPS: readonly ProviderId[] = ["met-norway"];
+
+/** The services this build may call: all of them, except on a phone. */
+export const AVAILABLE_PROVIDER_IDS = PROVIDER_IDS.filter(
+  (id) => !(isNativeApp() && NOT_IN_MOBILE_APPS.includes(id)),
+);
+
 // One instance of each, so what an adapter remembers (the NWS grid cell of a
 // place) lasts as long as the app is open.
 let instances: ForecastProvider[] | null = null;
 
 export function defaultProviders(): ForecastProvider[] {
-  instances ??= PROVIDER_IDS.map((id) => PROVIDERS[id]());
+  instances ??= AVAILABLE_PROVIDER_IDS.map((id) => PROVIDERS[id]());
   return instances;
 }
 

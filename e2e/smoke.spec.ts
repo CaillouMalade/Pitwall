@@ -179,13 +179,14 @@ test("session dashboard: verdict, maps, charts, then each source", async ({
   await expect(
     combined.getByText("Dry: none of the 9 forecasting centres expects rain."),
   ).toBeVisible();
-  await expect(combined.getByText(/^80% range: /).first()).toBeVisible();
+  await expect(combined.getByText(/^Range /).first()).toBeVisible();
   // Every centre says south-west: one vote each, however many feeds it has.
   await expect(combined.getByText("SW", { exact: true })).toBeVisible();
   await expect(combined.getByText("9 of 9 agree")).toBeVisible();
   await expect(combined.getByText("0 of 9 expect rain").first()).toBeVisible();
-  await expect(combined.getByText(/12 sources from 9 centres/)).toBeVisible();
-  await expect(combined.getByText("Forecasts agree")).toBeVisible();
+  // Every label says what it grades; a bare "High" could be the value.
+  await expect(combined.getByText("Forecasts agree")).toHaveCount(4);
+  await expect(combined.getByText(/^(high|low)$/i)).toHaveCount(0);
 
   // The maps: forecast rain and the wind on the circuit, both on the timeline.
   const rain = page.getByRole("region", { name: "Rain around the circuit" });
@@ -211,7 +212,7 @@ test("session dashboard: verdict, maps, charts, then each source", async ({
   await page.getByRole("button", { name: "Pause" }).click();
 
   // Radar is what was measured: the last two hours, with its own slider.
-  await rain.getByRole("radio", { name: "Past & current" }).click();
+  await rain.getByRole("radio", { name: "Radar" }).click();
   await expect(
     rain.getByRole("img", { name: "Rain radar around Red Bull Ring" }),
   ).toBeVisible();
@@ -259,7 +260,10 @@ test("session dashboard: verdict, maps, charts, then each source", async ({
     combined.getByText("Could go either way: 5 of 9 centres expect rain."),
   ).toBeVisible();
   await expect(combined.getByText("0.3 mm").first()).toBeVisible();
-  await expect(combined.getByText("Forecasts disagree")).toBeVisible();
+  // The headline's label names what the forecasts disagree on.
+  await expect(
+    combined.getByText(/^Forecasts disagree on .*rain/),
+  ).toBeVisible();
   await expect(combined.getByText(/chance of rain/i)).toHaveCount(0);
   await expect(
     page.getByRole("button", { name: "Previous session" }),
@@ -277,9 +281,6 @@ test("session dashboard: verdict, maps, charts, then each source", async ({
   // The race lasts two hours, and a session's rain is its total.
   await expect(
     page.getByText(/Race · Fri 20 Nov, 13:00–15:00 · 2 h/),
-  ).toBeVisible();
-  await expect(
-    combined.getByText(/the whole session \(2 hours\)/),
   ).toBeVisible();
 });
 
@@ -303,7 +304,7 @@ test("a failing service is skipped with a warning", async ({
   await openPage(page, "Session dashboard");
   await expect(
     page
-      .getByRole("region", { name: "Combined" })
+      .getByRole("region", { name: "By source" })
       .getByText(/11 sources from 9 centres/),
   ).toBeVisible();
 });
@@ -323,9 +324,8 @@ test("with one service left, the page says so instead of drawing a range", async
   await openPage(page, "Session dashboard");
   const combined = page.getByRole("region", { name: "Combined" });
   await expect(combined.getByText("One source").first()).toBeVisible();
-  await expect(combined.getByText(/^1 source · /)).toBeVisible();
   await expect(combined.getByText("Too few forecasts")).toBeVisible();
-  await expect(combined.getByText(/80% range/)).toHaveCount(0);
+  await expect(combined.getByText(/^Range /)).toHaveCount(0);
 });
 
 test("a track anywhere: add, keep, edit and delete", async ({
@@ -609,8 +609,8 @@ test("units and services are settings, and they are kept", async ({ page }) => {
   await settings.getByRole("button", { name: "Close" }).click();
   await expect(combined.getByText(/°F$/).first()).toBeVisible();
   await expect(combined.getByText(/m\/s$/).first()).toBeVisible();
-  await expect(combined.getByText(/12 sources from 9 centres/)).toBeVisible();
   const table = page.getByRole("region", { name: "By source" });
+  await expect(table.getByText(/12 sources from 9 centres/)).toBeVisible();
   await expect(
     table.getByRole("rowheader", { name: "GeoSphere Austria" }),
   ).toBeVisible();
@@ -621,7 +621,7 @@ test("units and services are settings, and they are kept", async ({ page }) => {
   await page.reload();
   await openPage(page, "Session dashboard");
   await expect(combined.getByText(/°F$/).first()).toBeVisible();
-  await expect(combined.getByText(/12 sources from 9 centres/)).toBeVisible();
+  await expect(table.getByText(/12 sources from 9 centres/)).toBeVisible();
   await openPage(page, "History");
   await page.getByRole("radio", { name: "Recent" }).click();
   await expect(page.getByText("Mean temperature, °F")).toBeVisible();
@@ -658,7 +658,7 @@ test("history: the weekend's dates over 20 years", async ({
     "High",
     "Wind",
   ]);
-  await expect(page.getByText(/reanalysis/)).toBeVisible();
+  await expect(page.getByText(/Reanalysis/)).toBeVisible();
   // One small request per year.
   expect(
     services.requests.filter((host) => host === "archive-api.open-meteo.com"),

@@ -6,6 +6,7 @@ import {
   formatNumber,
   formatWeekday,
 } from "../lib/format.ts";
+import { agreementText } from "../lib/dashboard.ts";
 import { combineForecasts, combinePeriod, confidence } from "../lib/stats.ts";
 import { centreOf } from "../lib/sources.ts";
 import type { Session } from "../lib/sessions.ts";
@@ -126,6 +127,7 @@ function SessionTiles({
           session.end,
           (source) => centreOf(source, track),
         );
+        const grades = confidence(combined);
         const over = session.end <= now;
         const known = combined.sources > 0 && !over;
         const wet =
@@ -171,7 +173,10 @@ function SessionTiles({
                         : ""}
                     </span>
                   </span>
-                  <ConfidenceBadge level={confidence(combined).overall} />
+                  <ConfidenceBadge
+                    level={grades.overall}
+                    text={agreementText(grades)}
+                  />
                 </>
               ) : (
                 <span className="tile-empty">

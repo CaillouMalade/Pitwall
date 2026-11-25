@@ -8,3 +8,4 @@ test-results
 package-lock.json
 web/public/THIRD_PARTY_NOTICES.txt
 web/src/data/observed-weather.csv
+android

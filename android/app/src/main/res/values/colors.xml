@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Mirrors the light background and accent in web/src/styles.css. -->
+    <color name="pitwall_background">#E9EDF5</color>
+    <color name="pitwall_accent">#2563EB</color>
+</resources>

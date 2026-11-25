@@ -1,5 +1,20 @@
 # Changelog
 
+## 3.0.0-preview.3 for Android — Pitwall on a phone
+
+The first Android app: the pages of Preview 3 in a phone frame, as an APK file.
+
+- The track card sits in a bar at the top and opens the track list; the four pages are a dock at the bottom. Dialogs rise from the bottom edge and the back gesture closes them.
+- One finger scrolls past a map, two move it. A CSV export opens the share sheet.
+- MET Norway is left out on a phone, as its terms ask of mobile apps. The other services are the desktop's.
+
+These changes to the pages come with it, and reach the desktop app with its next version:
+
+- How far the forecasts agree is a coloured dot with words ("Forecasts agree", "Some spread", "Forecasts disagree") under each value, in place of a bare "High" or "Low". The headline and the session tiles say what the forecasts disagree on.
+- The explanatory notes under the maps, charts and tables are gone. A value's "80% range" reads "Range"; [the method](docs/METHOD.md) says which range it is.
+- The rain map's switch reads "Forecast" and "Radar". Sessions on the charts are grey bands, no longer the colour of the temperature line.
+- The timeline stays in view only while its maps are, and the 15-minute rain chart is hidden when it has no rain to show.
+
 ## 3.0.0-preview.3 — Frosted for real
 
 - The frosted panels are now really frosted in the desktop app: the blur was dropped when the app was built. The page bar and the timeline get a frosted back once the page scrolls under them.

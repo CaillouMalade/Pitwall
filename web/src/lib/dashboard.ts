@@ -6,7 +6,12 @@ import {
   sourceLabel,
   sourceProvider,
 } from "./sources.ts";
-import { MIN_FOR_RANGE, type CombinedWindow, type Estimate } from "./stats.ts";
+import {
+  MIN_FOR_RANGE,
+  type CombinedWindow,
+  type Confidence,
+  type Estimate,
+} from "./stats.ts";
 import type { ForecastPoint } from "./types.ts";
 import { compassSector, type Sector } from "./wind.ts";
 import { windowStart } from "./windows.ts";
@@ -14,6 +19,7 @@ import { windowStart } from "./windows.ts";
 /**
  * How far the centres are apart, as text: the 80% range from 3 centres, both
  * values with 2, and a plain statement with 1. `show` converts and rounds.
+ * The screen calls it "Range"; docs/METHOD.md says which range it is.
  */
 export function rangeText(
   value: Estimate,
@@ -29,7 +35,26 @@ export function rangeText(
     value.high === null
   )
     return `${show(values[0])} and ${show(values[1])} ${unit}`;
-  return `80% range: ${show(value.low)} to ${show(value.high)} ${unit}`;
+  return `Range ${show(value.low)} to ${show(value.high)} ${unit}`;
+}
+
+const MEASURES = ["rain", "temperature", "wind"] as const;
+
+/**
+ * The overall grade with what it is about: "Forecasts disagree on temperature".
+ * A dry session with a wide temperature range would otherwise just read "disagree".
+ */
+export function agreementText(
+  grades: Record<(typeof MEASURES)[number] | "overall", Confidence>,
+): string {
+  const { overall } = grades;
+  if (overall === "unknown") return "Too few forecasts";
+  if (overall === "high") return "Forecasts agree";
+  const apart = MEASURES.filter((measure) => grades[measure] === overall);
+  const about = apart.length === MEASURES.length ? "" : apart.join(" and ");
+  if (overall === "low")
+    return about ? `Forecasts disagree on ${about}` : "Forecasts disagree";
+  return about ? `Some spread in ${about}` : "Some spread";
 }
 
 /** "3 of 9 expect rain" */

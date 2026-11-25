@@ -70,6 +70,8 @@ Pitwall collects nothing. Your tracks and settings stay on your computer, and th
 
 Download the Windows or Mac installer from the project's releases. The installers are not signed, so Windows and macOS warn before opening them; [docs/RELEASE.md](docs/RELEASE.md) shows what the warnings look like and how to open the app.
 
+For an Android phone, download the APK file from the same place; [docs/ANDROID_APP.md](docs/ANDROID_APP.md) says how to install it and what differs on a phone.
+
 ## Run from source
 
 With [Node.js](https://nodejs.org/) 22.13 or newer:

@@ -152,18 +152,22 @@ const CONFIDENCE_TEXT: Record<Confidence, string> = {
   unknown: "Too few forecasts",
 };
 
-/** How far the forecasts are apart, as a coloured label. */
+/**
+ * How far the forecasts are apart: a coloured dot and the words for it.
+ * The words always say what the colour means; a bare "low" could be the value.
+ */
 export function ConfidenceBadge({
   level,
-  short,
+  text,
 }: {
   level: Confidence;
-  short?: boolean;
+  /** Longer wording, like which values the forecasts disagree on. */
+  text?: string;
 }) {
   return (
     <span className={`confidence ${level}`}>
       <i aria-hidden="true" />
-      {short ? (level === "unknown" ? "n/a" : level) : CONFIDENCE_TEXT[level]}
+      {text ?? CONFIDENCE_TEXT[level]}
     </span>
   );
 }
@@ -173,7 +177,7 @@ export function Stat({
   value,
   detail,
   tone,
-  aside,
+  foot,
   children,
 }: {
   label: string;
@@ -181,21 +185,19 @@ export function Stat({
   detail?: ReactNode;
   /** Which of the weather colours the tile takes. */
   tone?: "temp" | "rain" | "wind";
-  /** Something small next to the label, like a confidence badge. */
-  aside?: ReactNode;
+  /** A last line under the detail, like how far the forecasts agree. */
+  foot?: ReactNode;
   children?: ReactNode;
 }) {
   return (
     <div className={`stat ${tone ?? ""}`}>
-      <span className="stat-label">
-        {label}
-        {aside}
-      </span>
+      <span className="stat-label">{label}</span>
       <span className="stat-value">
         {children}
         {value}
       </span>
       {detail && <span className="stat-detail">{detail}</span>}
+      {foot && <span className="stat-foot">{foot}</span>}
     </div>
   );
 }

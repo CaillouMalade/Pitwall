@@ -298,14 +298,6 @@ export function WindMap({
             </span>
           )}
         </p>
-        <p className="muted">
-          {straights.length > 0
-            ? `Straights of 220 m and more, with the wind along or across them in ${format.windUnit}. `
-            : ""}
-          The bold arrow is all forecasts together, each thin one a forecasting
-          centre. A forecast has one wind for the whole circuit; buildings and
-          trees change it locally.
-        </p>
       </div>
     </Card>
   );

@@ -7,6 +7,7 @@ import {
   type Choice,
 } from "./components/ComparisonPage.tsx";
 import { HistoryPage } from "./components/HistoryPage.tsx";
+import { PhoneBar } from "./components/PhoneBar.tsx";
 import { SessionDashboard } from "./components/SessionDashboard.tsx";
 import { SettingsDialog } from "./components/SettingsDialog.tsx";
 import { Sidebar } from "./components/Sidebar.tsx";
@@ -16,6 +17,7 @@ import { WeekendOverview } from "./components/WeekendOverview.tsx";
 import { Welcome } from "./components/Welcome.tsx";
 import { GRADE1_TRACKS } from "./data/grade1-tracks.ts";
 import type { HistoryPeriod } from "./lib/history-source.ts";
+import { isNativeApp, onNativeBack } from "./lib/native.ts";
 import { fetchZone } from "./lib/rain-map.ts";
 import {
   planFromType,
@@ -45,10 +47,20 @@ import { useForecast, useOnline } from "./lib/use-data.ts";
 import { isZone, trackZone } from "./lib/zone.ts";
 
 export const PAGES = [
-  { id: "overview", label: "Weekend overview", icon: CalendarRange },
-  { id: "session", label: "Session dashboard", icon: Gauge },
-  { id: "history", label: "History", icon: History },
-  { id: "comparison", label: "Track comparison", icon: GitCompareArrows },
+  {
+    id: "overview",
+    label: "Weekend overview",
+    short: "Weekend",
+    icon: CalendarRange,
+  },
+  { id: "session", label: "Session dashboard", short: "Session", icon: Gauge },
+  { id: "history", label: "History", short: "History", icon: History },
+  {
+    id: "comparison",
+    label: "Track comparison",
+    short: "Compare",
+    icon: GitCompareArrows,
+  },
 ] as const;
 export type PageId = (typeof PAGES)[number]["id"];
 
@@ -98,6 +110,29 @@ export default function App() {
     return () => window.removeEventListener("scroll", read);
   }, []);
   const [page, setPage] = useState<PageId>("overview");
+  // The packaged phone app: a top bar and bottom tabs instead of the sidebar.
+  const phone = isNativeApp();
+  useEffect(() => {
+    // The bottom tabs stay on screen, so each page opens from its top.
+    if (phone) window.scrollTo(0, 0);
+  }, [phone, page]);
+  // Android back closes the topmost layer first, then returns to the overview.
+  useEffect(
+    () =>
+      onNativeBack(() => {
+        const dialog = document.querySelector("dialog[open]");
+        if (dialog)
+          dialog.dispatchEvent(new Event("cancel", { cancelable: true }));
+        else if (document.querySelector(".phone-menu-list"))
+          document.dispatchEvent(
+            new KeyboardEvent("keydown", { key: "Escape" }),
+          );
+        else if (page !== "overview") setPage("overview");
+        else return false;
+        return true;
+      }),
+    [page],
+  );
   const [sessionIndex, setSessionIndex] = useState(0);
   const [period, setPeriod] = useState<HistoryPeriod>(30);
   const [compared, setCompared] = useState<Choice[] | null>(null);
@@ -206,24 +241,39 @@ export default function App() {
       <a className="skip-link" href="#content">
         Skip to content
       </a>
-      <Sidebar
-        tracks={tracks}
-        userTracks={userTracks}
-        track={track}
-        sessions={sessions}
-        now={now}
-        currentSession={page === "session" ? session : null}
-        onSelect={selectTrack}
-        onSession={(index) => {
-          setSessionIndex(index);
-          setPage("session");
-        }}
-        onAddTrack={() => setDialog("add-track")}
-        onEditTrack={() => setDialog("edit-track")}
-        onEditWeekend={() => setDialog("weekend")}
-        onSettings={() => setDialog("settings")}
-        onAbout={() => setDialog("about")}
-      />
+      {phone ? (
+        <PhoneBar
+          userTracks={userTracks}
+          track={track}
+          now={now}
+          scrolled={scrolled}
+          onSelect={selectTrack}
+          onAddTrack={() => setDialog("add-track")}
+          onEditTrack={() => setDialog("edit-track")}
+          onEditWeekend={() => setDialog("weekend")}
+          onSettings={() => setDialog("settings")}
+          onAbout={() => setDialog("about")}
+        />
+      ) : (
+        <Sidebar
+          tracks={tracks}
+          userTracks={userTracks}
+          track={track}
+          sessions={sessions}
+          now={now}
+          currentSession={page === "session" ? session : null}
+          onSelect={selectTrack}
+          onSession={(index) => {
+            setSessionIndex(index);
+            setPage("session");
+          }}
+          onAddTrack={() => setDialog("add-track")}
+          onEditTrack={() => setDialog("edit-track")}
+          onEditWeekend={() => setDialog("weekend")}
+          onSettings={() => setDialog("settings")}
+          onAbout={() => setDialog("about")}
+        />
+      )}
       <main className="main" id="content">
         <nav className={scrolled ? "tabs scrolled" : "tabs"} aria-label="Pages">
           {PAGES.map((item) => (
@@ -236,7 +286,7 @@ export default function App() {
               onClick={() => setPage(item.id)}
             >
               <item.icon size={15} aria-hidden="true" />
-              <span>{item.label}</span>
+              <span>{phone ? item.short : item.label}</span>
             </button>
           ))}
         </nav>

@@ -69,6 +69,7 @@ The build is already set up for signing if credentials ever exist: `PITWALL_SIGN
 
 - `Pitwall-<version>-windows-x64-preview-setup.exe`, `WINDOWS-SHA256SUMS.txt`, `WINDOWS-BUILD-INFO.json`
 - `Pitwall-<version>-mac-universal-preview.dmg` and `.zip`, `SHA256SUMS.txt`, `BUILD-INFO.json`
+- `Pitwall-<version>-android-preview.apk`, `ANDROID-SHA256SUMS.txt`: built and signed on the maintainer's computer, then added to the release by hand ([ANDROID_APP.md](ANDROID_APP.md))
 
 Inside the app: the MIT licence, the third-party notices, Electron's and Chromium's licences, and the data terms, privacy and terms-of-use documents.
 

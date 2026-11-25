@@ -1,5 +1,14 @@
 import { CREDITS, REPOSITORY } from "../lib/credits.ts";
+import { AVAILABLE_PROVIDER_IDS } from "../lib/providers/index.ts";
+import { PROVIDER_LABELS } from "../lib/sources.ts";
 import { Dialog } from "./ui.tsx";
+
+// A service this build never calls is not credited as a source of its data.
+const credits = CREDITS.filter(
+  (credit) =>
+    AVAILABLE_PROVIDER_IDS.includes("met-norway") ||
+    credit.name !== PROVIDER_LABELS["met-norway"],
+);
 
 const link = { target: "_blank", rel: "noreferrer" } as const;
 
@@ -27,7 +36,7 @@ export function AboutDialog({ onClose }: { onClose: () => void }) {
         <section aria-labelledby="about-data">
           <h3 id="about-data">Data</h3>
           <ul className="credits">
-            {CREDITS.map((credit) => (
+            {credits.map((credit) => (
               <li key={credit.name}>
                 <a href={credit.url} {...link}>
                   {credit.name}

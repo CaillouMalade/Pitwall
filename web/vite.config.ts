@@ -32,7 +32,12 @@ export default defineConfig({
               test: /[\\/]node_modules[\\/]leaflet[\\/]/,
               priority: 30,
             },
-            { name: "charts", test: /[\\/]node_modules[\\/]/, priority: 10 },
+            // Android-only plugins are left out so they load on demand, never at start-up.
+            {
+              name: "charts",
+              test: /[\\/]node_modules[\\/](?!@capacitor[\\/])/,
+              priority: 10,
+            },
           ],
         },
       },

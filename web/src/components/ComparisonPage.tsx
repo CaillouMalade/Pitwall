@@ -300,15 +300,7 @@ function ComparisonResults({
         </div>
       </Card>
       <ChartGroup>
-        <Card
-          title="Day by day"
-          aside={
-            <span className="muted">
-              Rain in mm on one scale, then low to high temperature in{" "}
-              {format.temperatureUnit}; wettest track first
-            </span>
-          }
-        >
+        <Card title="Day by day">
           <div className="multiples">
             {perTrack.map((item) => (
               <section key={item.summary.trackId} className="multiple">

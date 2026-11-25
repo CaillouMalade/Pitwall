@@ -1,5 +1,5 @@
 import { PROVIDER_AREAS } from "../lib/credits.ts";
-import { PROVIDER_IDS } from "../lib/providers/index.ts";
+import { AVAILABLE_PROVIDER_IDS } from "../lib/providers/index.ts";
 import { useSettings } from "../lib/settings.tsx";
 import { PROVIDER_LABELS } from "../lib/sources.ts";
 import { TEMPERATURE_UNITS, WIND_UNITS } from "../lib/units.ts";
@@ -8,7 +8,7 @@ import { Dialog, Segmented } from "./ui.tsx";
 
 export function SettingsDialog({ onClose }: { onClose: () => void }) {
   const { units, setUnits, providersOff, setProvidersOff } = useSettings();
-  const on = PROVIDER_IDS.filter((id) => !providersOff.includes(id));
+  const on = AVAILABLE_PROVIDER_IDS.filter((id) => !providersOff.includes(id));
 
   return (
     <Dialog title="Settings" onClose={onClose}>
@@ -37,7 +37,7 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
         </div>
         <fieldset className="setting-list">
           <legend>Forecast services</legend>
-          {PROVIDER_IDS.map((id) => {
+          {AVAILABLE_PROVIDER_IDS.map((id) => {
             const checked = !providersOff.includes(id);
             return (
               <label key={id} className="check">

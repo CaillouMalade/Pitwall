@@ -2,6 +2,7 @@ import { LANE_PX, swarm } from "../lib/swarm.ts";
 import { useEffect, useMemo, useState } from "react";
 import { ArrowUp, ChevronLeft, ChevronRight, Pause, Play } from "lucide-react";
 import {
+  agreementText,
   rainText,
   rangeText,
   sessionMessage,
@@ -291,38 +292,34 @@ function SessionView({
           (point) => point.time >= from && point.time < to,
         )
       : [];
+  // A flat line of zeros under the hourly chart says nothing new.
+  const quarterRain = quarter.some((point) => (point.rain ?? 0) > 0);
+  // One source has nothing to agree with; the headline's label says so once.
+  const agreement = (level: Confidence) =>
+    level === "unknown" ? undefined : <ConfidenceBadge level={level} />;
 
   return (
     <>
       <Card className="verdict-card" label="Combined">
         <div className="verdict">
-          <div>
-            <p className="verdict-text">{verdict(combined)}</p>
-            <p className="muted">
-              {sourcesText(combined)} · values for the whole session (
-              {combined.hours === 1 ? "1 hour" : `${combined.hours} hours`})
-            </p>
-          </div>
-          <ConfidenceBadge level={grades.overall} />
+          <p className="verdict-text">{verdict(combined)}</p>
+          <ConfidenceBadge
+            level={grades.overall}
+            text={agreementText(grades)}
+          />
         </div>
         <div className="stats">
           <Stat
             tone="rain"
             label="Rain"
-            aside={<ConfidenceBadge level={grades.rain} short />}
+            foot={agreement(grades.rain)}
             value={formatValue(combined.rain.value, "mm")}
-            detail={
-              <>
-                {rainText(combined)}
-                <br />
-                {rangeText(combined.rain, "mm", (value) => formatNumber(value))}
-              </>
-            }
+            detail={rainText(combined)}
           />
           <Stat
             tone="temp"
             label="Temperature"
-            aside={<ConfidenceBadge level={grades.temperature} short />}
+            foot={agreement(grades.temperature)}
             value={format.temperature(combined.temperature.value)}
             detail={rangeText(
               combined.temperature,
@@ -333,7 +330,7 @@ function SessionView({
           <Stat
             tone="wind"
             label="Wind"
-            aside={<ConfidenceBadge level={grades.wind} short />}
+            foot={agreement(grades.wind)}
             value={format.wind(combined.wind.value)}
             detail={rangeText(
               combined.wind,
@@ -361,95 +358,95 @@ function SessionView({
           </Stat>
           <Stat
             tone="rain"
-            label="Rain in the 3 hours before"
+            label="Rain, 3 hours before"
             value={formatValue(before.rain.value, "mm")}
             detail={
               before.rainVoters
-                ? `${rainText(before)}: ${before.rainVotes * 2 >= before.rainVoters ? "the track may still be damp" : "a dry track is likely"}`
+                ? before.rainVotes * 2 >= before.rainVoters
+                  ? "Track may still be damp"
+                  : "Dry track likely"
                 : "No value"
             }
           />
         </div>
       </Card>
 
-      <div className="timeline" role="group" aria-label="Timeline of the maps">
-        <button
-          type="button"
-          className="icon-button large play"
-          onClick={() => setPlaying(!playing)}
-          aria-label={playing ? "Pause" : "Play"}
-          aria-pressed={playing}
+      {/* The timeline stays in view for as long as the maps it moves do. */}
+      <div className="map-section">
+        <div
+          className="timeline"
+          role="group"
+          aria-label="Timeline of the maps"
         >
-          {playing ? (
-            <Pause size={16} aria-hidden="true" />
-          ) : (
-            <Play size={16} aria-hidden="true" />
-          )}
-        </button>
-        <span className="timeline-end">{formatClock(first, zone)}</span>
-        <div className="timeline-track">
-          <span
-            className="timeline-session"
-            aria-hidden="true"
-            style={{
-              left: `${((session.start - first) / (last - first)) * 100}%`,
-              width: `${((session.end - session.start) / (last - first)) * 100}%`,
-            }}
+          <button
+            type="button"
+            className="icon-button large play"
+            onClick={() => setPlaying(!playing)}
+            aria-label={playing ? "Pause" : "Play"}
+            aria-pressed={playing}
+          >
+            {playing ? (
+              <Pause size={16} aria-hidden="true" />
+            ) : (
+              <Play size={16} aria-hidden="true" />
+            )}
+          </button>
+          <span className="timeline-end">{formatClock(first, zone)}</span>
+          <div className="timeline-track">
+            <span
+              className="timeline-session"
+              aria-hidden="true"
+              style={{
+                left: `${((session.start - first) / (last - first)) * 100}%`,
+                width: `${((session.end - session.start) / (last - first)) * 100}%`,
+              }}
+            />
+            <input
+              type="range"
+              min={0}
+              max={steps}
+              step={1}
+              value={step}
+              aria-label="Time shown on the maps"
+              aria-valuetext={formatClock(at, zone)}
+              onChange={(event) => {
+                setPlaying(false);
+                setStep(Number(event.target.value));
+              }}
+            />
+          </div>
+          <span className="timeline-end">{formatClock(last, zone)}</span>
+          <output className="timeline-now">{formatClock(at, zone)}</output>
+        </div>
+
+        <div className="map-grid">
+          <RainMap
+            track={track}
+            grid={
+              over ? { state: "failed", message: "the session is over." } : grid
+            }
+            radar={radar}
+            at={at}
+            mode={mode}
+            onMode={setMode}
+            zone={zone}
           />
-          <input
-            type="range"
-            min={0}
-            max={steps}
-            step={1}
-            value={step}
-            aria-label="Time shown on the maps"
-            aria-valuetext={formatClock(at, zone)}
-            onChange={(event) => {
-              setPlaying(false);
-              setStep(Number(event.target.value));
-            }}
+          <WindMap
+            track={track}
+            window={hourWindow}
+            centres={hourCentres}
+            hour={hour}
+            zone={zone}
           />
         </div>
-        <span className="timeline-end">{formatClock(last, zone)}</span>
-        <output className="timeline-now">{formatClock(at, zone)}</output>
-      </div>
-
-      <div className="map-grid">
-        <RainMap
-          track={track}
-          grid={
-            over ? { state: "failed", message: "the session is over." } : grid
-          }
-          radar={radar}
-          at={at}
-          mode={mode}
-          onMode={setMode}
-          zone={zone}
-        />
-        <WindMap
-          track={track}
-          window={hourWindow}
-          centres={hourCentres}
-          hour={hour}
-          zone={zone}
-        />
       </div>
 
       <ChartGroup>
-        <Card
-          title="Rain and temperature around the session"
-          aside={
-            <span className="muted">
-              Rain counts from {RAIN_THRESHOLD_MM} mm in an hour
-            </span>
-          }
-        >
+        <Card title="Rain and temperature around the session">
           <div className="chart-stack">
             <TemperatureChart {...chart} height={170} />
             <RainChart {...chart} />
-            {quarter.length > 0 && (
-              <QuarterRainChart {...chart} points={quarter} />
-            )}
+            {quarterRain && <QuarterRainChart {...chart} points={quarter} />}
           </div>
         </Card>
         <Card title="Wind around the session">
@@ -457,14 +454,7 @@ function SessionView({
         </Card>
       </ChartGroup>
 
-      <Card
-        title="How far the forecasts are apart"
-        aside={
-          <span className="muted">
-            One dot per forecasting centre, for the whole session
-          </span>
-        }
-      >
+      <Card title="How far the forecasts are apart">
         <div className="spreads">
           <Spread
             label="Rain"
@@ -518,18 +508,16 @@ function SessionView({
 
       <Card
         title="By source"
-        aside={
-          <span className="muted">
-            Mean over the session; rain is its total
-          </span>
-        }
+        aside={<span className="muted">{sourcesText(combined)}</span>}
       >
         <div className="table-wrap">
           <table className="table">
             <thead>
               <tr>
                 <th scope="col">Source</th>
-                <th scope="col">Centre</th>
+                <th scope="col" className="centre">
+                  Centre
+                </th>
                 <th scope="col" className="num">
                   Temperature
                 </th>
@@ -645,9 +633,6 @@ function Spread({
       <div className="spread-head">
         <span className="spread-label">{label}</span>
         <ConfidenceBadge level={level} />
-        <span className="spread-range muted">
-          {show(sorted[0].value)} to {show(sorted.at(-1)!.value)} {unit}
-        </span>
       </div>
       <div
         className="spread-line"

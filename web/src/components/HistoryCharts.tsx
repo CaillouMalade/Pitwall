@@ -160,14 +160,7 @@ export function DailyCharts({
   return (
     <div className="chart-stack">
       <div className="chart-panel" {...rainHover.handlers}>
-        {!compact && (
-          <Legend
-            color={rainColor}
-            note={`A rain day has ${RAIN_DAY_MM} mm or more`}
-          >
-            Rain, mm per day
-          </Legend>
-        )}
+        {!compact && <Legend color={rainColor}>Rain, mm per day</Legend>}
         <div
           role="img"
           aria-label={`Rain per day: ${formatNumber(present(data.map((row) => row.rain)).reduce((sum, rain) => sum + rain, 0))} mm in total over ${days.length} days.`}
@@ -227,7 +220,7 @@ export function DailyCharts({
 
       <div className="chart-panel" {...tempHover.handlers}>
         {!compact && (
-          <Legend color={tempColor} band="" note="Band: the day's low to high">
+          <Legend color={tempColor} band="" bandLabel="Low to high">
             Mean temperature, {format.temperatureUnit}
           </Legend>
         )}
@@ -296,7 +289,7 @@ export function DailyCharts({
 
       {!compact && hasWind && (
         <div className="chart-panel" {...windHover.handlers}>
-          <Legend color={windColor} note="Dashed: the strongest gust">
+          <Legend color={windColor} note="Dashed: gusts">
             Strongest wind, {format.windUnit}
           </Legend>
           <div

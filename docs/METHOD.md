@@ -8,7 +8,7 @@ For each hour:
 
 1. Sources from the same forecasting centre are merged into one value (their median).
 2. The **combined value** is the median of the centres.
-3. The **80% range** is the 10th to 90th percentile of the centres, shown only with 3 centres or more.
+3. The **80% range** is the 10th to 90th percentile of the centres, shown only with 3 centres or more. On screen it is labelled "Range".
 4. **Rain** adds a count: "3 of 9 expect rain", where rain is 0.2 mm or more in the hour.
 5. **Wind direction** is a vote between 8 compass sectors: "7 of 9 agree: SW".
 
@@ -68,7 +68,7 @@ It is shown only from **3 centres**. With 2 there is no "spread", only two numbe
 
 **What the range is:** how far today's independent forecasts are apart. Wide means they disagree and the answer is uncertain; narrow means they agree.
 
-**What it is not:** a probability for the weather. "80% range: 11 to 13 °C" does not mean the temperature will be between 11 and 13 with 80% chance. Forecasts can all agree and all be wrong, and because the centres are not fully independent the true uncertainty is usually somewhat wider than the range.
+**What it is not:** a probability for the weather. "Range 11 to 13 °C" does not mean the temperature will be between 11 and 13 with 80% chance. Forecasts can all agree and all be wrong, and because the centres are not fully independent the true uncertainty is usually somewhat wider than the range.
 
 ### Why not the 95% confidence interval of the first version
 

@@ -187,16 +187,17 @@ function sessionMarks(
         key={`${session.name}-area`}
         x1={session.start}
         x2={session.end}
-        fill="var(--mood)"
-        fillOpacity={focused ? 0.16 : focus ? 0.05 : 0.09}
+        // Neutral: a weather colour here would read as one of the values.
+        fill="var(--text)"
+        fillOpacity={focused ? 0.1 : focus ? 0.03 : 0.06}
         stroke="none"
         ifOverflow="hidden"
       />,
       <ReferenceLine
         key={`${session.name}-line`}
         x={session.start}
-        stroke="var(--mood)"
-        strokeOpacity={focused || !focus ? 0.7 : 0.3}
+        stroke="var(--text-2)"
+        strokeOpacity={focused || !focus ? 0.6 : 0.25}
         strokeWidth={1}
         ifOverflow="hidden"
         label={
@@ -380,11 +381,15 @@ export function Legend({
   color,
   children,
   band: bandClass,
+  bandLabel = "Range between forecasts",
   note,
 }: {
   color: string;
   children: React.ReactNode;
+  /** Names the shaded range; left out where the chart above already did. */
   band?: string;
+  bandLabel?: string;
+  /** One more mark of the drawing, in a word or two. */
   note?: string;
 }) {
   return (
@@ -393,7 +398,7 @@ export function Legend({
       {bandClass !== undefined && (
         <>
           <span className={`legend-band ${bandClass}`} aria-hidden="true" />
-          Range between forecasts
+          {bandLabel}
         </>
       )}
       {note && <span className="chart-note">{note}</span>}
@@ -507,9 +512,7 @@ export function RainChart(props: ChartProps & { height?: number }) {
   );
   return (
     <div className="chart-panel" {...hover.handlers}>
-      <Legend color="var(--rain)" band="rain">
-        Rain, mm per hour
-      </Legend>
+      <Legend color="var(--rain)">Rain, mm per hour</Legend>
       <div
         role="img"
         aria-label={summary(
@@ -625,11 +628,7 @@ export function WindChart(props: ChartProps & { height?: number }) {
   const every = Math.max(1, Math.round((to - from) / HOUR / 24));
   return (
     <div className="chart-panel" {...hover.handlers}>
-      <Legend
-        color="var(--wind)"
-        band="wind"
-        note="Arrows: where the wind blows to; fainter when fewer agree"
-      >
+      <Legend color="var(--wind)" band="wind">
         Wind, {format.windUnit}
       </Legend>
       <div
@@ -729,12 +728,7 @@ export function QuarterRainChart({
   const total = points.reduce((sum, point) => sum + (point.rain ?? 0), 0);
   return (
     <div className="chart-panel" {...hover.handlers}>
-      <Legend
-        color="var(--rain-2)"
-        note="One model (Open-Meteo best match), so no range"
-      >
-        Rain, mm per 15 minutes
-      </Legend>
+      <Legend color="var(--rain-2)">Rain, mm per 15 minutes</Legend>
       <div
         role="img"
         aria-label={`Rain in 15-minute steps: ${formatNumber(total)} mm in total.`}

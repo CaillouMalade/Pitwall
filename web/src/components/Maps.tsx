@@ -1,3 +1,4 @@
+import { isNativeApp } from "../lib/native.ts";
 import { useEffect, useRef, useState } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
@@ -50,6 +51,8 @@ function useMap(
       zoomControl: true,
       attributionControl: true,
       scrollWheelZoom: false,
+      // On a phone one finger scrolls the page past the map; two move the map.
+      dragging: !isNativeApp(),
     });
     created.attributionControl.setPrefix(false);
     setupRef.current(created);
@@ -242,7 +245,7 @@ export type RainMode = "forecast" | "radar";
 
 const MODES = [
   { value: "forecast", label: "Forecast" },
-  { value: "radar", label: "Past & current" },
+  { value: "radar", label: "Radar" },
 ] as const;
 
 function RainLegend() {
@@ -260,16 +263,13 @@ function RainLegend() {
       <span>Light</span>
       <i style={{ background: `linear-gradient(90deg, ${stops})` }} />
       <span>Heavy</span>
-      <span className="rain-legend-values">
-        {RAIN_SCALE[1][0]} to {RAIN_SCALE.at(-1)![0]}+ mm/h
-      </span>
     </div>
   );
 }
 
 /**
  * Rain around the circuit. "Forecast" is one model's rain for the session, moved
- * by the page's timeline; "Past & current" is the radar: what was measured in
+ * by the page's timeline; "Radar" is what was measured in
  * the last two hours, with its own slider.
  */
 export function RainMap({
@@ -441,11 +441,6 @@ export function RainMap({
       )}
       <div className="map-foot">
         <RainLegend />
-        <p className="muted">
-          {mode === "forecast"
-            ? "One model's forecast (Open-Meteo best match) on a grid of 8 km, not the combination of all sources. Follows the timeline above."
-            : "Measured by rain radar over the last two hours. It cannot show a session that has not started."}
-        </p>
       </div>
     </Card>
   );
